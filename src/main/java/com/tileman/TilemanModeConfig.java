@@ -166,17 +166,17 @@ public interface TilemanModeConfig extends Config {
     }
 
     @Range(
-            min = Integer.MIN_VALUE
+            min = 1
     )
     @ConfigItem(
-            keyName = "tilesOffset",
-            name = "Bonus tiles",
-            description = "Add more tiles to your limit, set to 0 for off",
+            keyName = "radius",
+            name = "Area Radius",
+            description = "",
             section = customGameModeSection,
             position = 2
     )
     default int tilesOffset() {
-        return 9;
+        return 1;
     }
 
     @ConfigItem(
