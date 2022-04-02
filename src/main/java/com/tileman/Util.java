@@ -33,6 +33,10 @@ public class Util {
         return false;
     }
 
+    public static boolean isEmpty(String str) {
+        return str == null || str.isEmpty();
+    }
+
     public static <T> Set<T> set() {
         return (Set<T>)new HashSet<T>();
     }

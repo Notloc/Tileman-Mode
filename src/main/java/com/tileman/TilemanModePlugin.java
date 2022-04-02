@@ -197,7 +197,7 @@ public class TilemanModePlugin extends Plugin {
         loadPoints();
         updateTileCounter();
         log.debug("startup");
-        TilemanImportPanel panel = new TilemanImportPanel(this);
+        TilemanPluginPanel panel = new TilemanPluginPanel(this);
         NavigationButton navButton = NavigationButton.builder()
                 .tooltip("Tileman Import")
                 .icon(ImageUtil.getResourceStreamFromClass(getClass(), "/icon.png"))
@@ -641,7 +641,5 @@ public class TilemanModePlugin extends Plugin {
                     .collect(Collectors.toSet());
         }
     }
-
-
 
 }
