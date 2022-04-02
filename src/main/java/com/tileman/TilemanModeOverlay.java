@@ -70,7 +70,7 @@ public class TilemanModeOverlay extends Overlay
 		{
 			List<TilemanModeTile> tiles = tilesByRegion.get(region);
 			worldPointBuffer.clear();
-			TilemanModePlugin.translateTilesToWorldPoints(client, tiles, worldPointBuffer);
+			Util.translateTilesToWorldPoints(client, tiles, worldPointBuffer);
 
 			for (final WorldPoint point : worldPointBuffer)
 			{
