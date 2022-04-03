@@ -17,6 +17,18 @@ public class TilemanPluginPanel extends PluginPanel {
 
     public TilemanPluginPanel(TilemanModePlugin plugin) {
         this.plugin = plugin;
+        build();
+    }
+
+    public void rebuild() {
+        SwingUtilities.invokeLater(() ->  {
+            build();
+            this.revalidate();
+        });
+    }
+
+    private void build() {
+        this.removeAll();
 
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -40,16 +52,39 @@ public class TilemanPluginPanel extends PluginPanel {
             {
                 multiplayerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-                JTextField ipInput = new JTextField("IP Address");
-                multiplayerPanel.add(ipInput);
+                if (TilemanMultiplayerService.isHosting()) {
+                    JLabel serverLabel = new JLabel("Server is running on port " + TilemanMultiplayerService.getServerPort());
+                    multiplayerPanel.add(serverLabel);
 
-                JButton connectButton = new JButton("Connect");
-                connectButton.addActionListener(e -> TilemanMultiplayerService.connect(plugin.getClient(), ipInput.getText(), PORT));
-                multiplayerPanel.add(connectButton);
+                    JButton shutdownButton = new JButton("Shutdown Server");
+                    shutdownButton.addActionListener(e -> TilemanMultiplayerService.stopServer());
+                    multiplayerPanel.add(shutdownButton);
 
-                JButton startServerButton = new JButton("Launch Server");
-                startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(PORT));
-                multiplayerPanel.add(startServerButton);
+                    multiplayerPanel.add(Box.createVerticalStrut(20));
+                }
+                if (TilemanMultiplayerService.isConnected()) {
+                    JLabel label = new JLabel("CONNECTED~!");
+                    multiplayerPanel.add(label);
+
+                    JButton disconnectButton = new JButton("Disconnect");
+                    disconnectButton.addActionListener(e -> TilemanMultiplayerService.disconnect());
+                    multiplayerPanel.add(disconnectButton);
+
+                    multiplayerPanel.add(Box.createVerticalStrut(20));
+                } else {
+                    JTextField ipInput = new JTextField("IP Address");
+                    multiplayerPanel.add(ipInput);
+
+                    JButton connectButton = new JButton("Connect");
+                    connectButton.addActionListener(e -> TilemanMultiplayerService.connect(plugin.getClient(), ipInput.getText(), PORT));
+                    multiplayerPanel.add(connectButton);
+
+                    JButton startServerButton = new JButton("Launch Server");
+                    startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(plugin.getClient(), PORT));
+                    multiplayerPanel.add(startServerButton);
+
+                    multiplayerPanel.add(Box.createVerticalStrut(20));
+                }
             }
 
             JPanel importPanel = new JPanel();

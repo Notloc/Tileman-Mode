@@ -8,17 +8,17 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.net.UnknownHostException;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class TilemanClient extends Thread {
 
-    private Client client;
-    private String hostname;
-    private int portNumber = 7777;
+    private final Client client;
+    private final String hostname;
+    private final int portNumber;
 
-    private ConcurrentLinkedQueue<Object> queuedPacketsAndData = new ConcurrentLinkedQueue<>();
-    private ConcurrentSetMap<Integer, TilemanModeTile> serverTileData = new ConcurrentSetMap<>();
+    private final ConcurrentLinkedQueue<Object> queuedPacketsAndData = new ConcurrentLinkedQueue<>();
+    private final ConcurrentSetMap<Integer, TilemanModeTile> serverTileData = new ConcurrentSetMap<>();
 
     private TilemanPacket cachedPacket;
     private boolean stayConnected;
@@ -48,7 +48,7 @@ public class TilemanClient extends Thread {
             //TODO: sync tile data before beginning normal operation
             //      send ALL your tiles for other players
             //      (use hashing to determine what can be skipped, server should save ur profile/tiles from prev connections,
-            //          so you dont need to be logged in for others to use your tiles.)
+            //          so you don't need to be logged in for others to use your tiles.)
 
             clientState = ClientState.CONNECTED;
             requestRegionData(client.getMapRegions());
@@ -65,14 +65,7 @@ public class TilemanClient extends Thread {
 
                 sleep(5);
             }
-
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException | IOException | ClassNotFoundException e) {
             e.printStackTrace();
         } finally {
             clientState = ClientState.DISCONNECTED;
@@ -94,21 +87,23 @@ public class TilemanClient extends Thread {
     private void handlePacket(TilemanPacket packet, ObjectInputStream input, ObjectOutputStream output) throws IOException, ClassNotFoundException {
         switch (packet.packetType) {
             case REGION_DATA_RESPONSE:
-                handleIncomingRegionData(input);
+                handleIncomingRegionData(packet, input);
                 break;
             case TILE_UPDATE:
                 handleTileUpdate(packet, input);
+                break;
             default:
-                throw new IOException("Unexpected packet type!");
+                throw new IOException("Unexpected packet type in client: " + packet.packetType);
         }
     }
 
-    private void handleIncomingRegionData(ObjectInputStream input) throws IOException, ClassNotFoundException {
+    private void handleIncomingRegionData(TilemanPacket packet, ObjectInputStream input) throws IOException, ClassNotFoundException {
+        int regionId = Integer.parseInt(packet.message);
         while (input.available() > 0) {
             Object object = input.readObject();
-            if (object instanceof TilemanModeTile) {
-                TilemanModeTile tile = (TilemanModeTile)object;
-                serverTileData.add(tile.getRegionId(), tile);
+            if (object instanceof List) {
+                List<TilemanModeTile> tiles = (List<TilemanModeTile>)object;
+                serverTileData.addAll(regionId, tiles);
             } else {
                 cachedPacket = (TilemanPacket)object;
                 break;
@@ -120,7 +115,7 @@ public class TilemanClient extends Thread {
         Object object = input.readObject();
         TilemanModeTile tile = (TilemanModeTile)object;
         if (serverTileData.containsKey(tile.getRegionId())) {
-            Boolean tileState = Boolean.valueOf(packet.message);
+            boolean tileState = Boolean.parseBoolean(packet.message);
             if (tileState) {
                 serverTileData.add(tile.getRegionId(), tile);
             } else {
@@ -129,18 +124,14 @@ public class TilemanClient extends Thread {
         }
     }
 
-    private static void print(String string) {
-        System.out.println("Client: " + string);
-    }
-
     public void requestRegionData(int[] regionIds) {
         for (int regionId : regionIds) {
-            queuedPacketsAndData.add(TilemanPacket.CreateRegionDataRequest(client.getUsername(), regionId));
+            queuedPacketsAndData.add(TilemanPacket.CreateRegionDataRequest(client.getAccountHash(), regionId));
         }
     }
 
     public void sendTileUpdate(TilemanModeTile tile, boolean state) {
-        queuedPacketsAndData.add(TilemanPacket.CreateTileUpdatePacket(client.getUsername(), state));
+        queuedPacketsAndData.add(TilemanPacket.CreateTileUpdatePacket(client.getAccountHash(), state));
         queuedPacketsAndData.add(tile);
     }
 

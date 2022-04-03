@@ -1,26 +1,37 @@
 package com.tileman.multiplayer;
 
 import com.tileman.TilemanModeTile;
+import lombok.Getter;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class TilemanServer extends Thread {
 
-    private int portNumber;
+    @Getter
+    private final int portNumber;
     private ServerSocket serverSocket;
 
+    private boolean isServerRunning;
+
     // Data structure gore, I'm sorry.
-    // It's each username's individual tile data, mapped by region id, stored in sets.
-    ConcurrentHashMap<String, ConcurrentSetMap<Integer, TilemanModeTile>> playerTileData = new ConcurrentHashMap<>();
+    // It's a thread safe map by userHash of each user's tile data. Tile data is mapped by region and stored in hashsets.
+    ConcurrentHashMap<Long, ConcurrentSetMap<Integer, TilemanModeTile>> playerTileData = new ConcurrentHashMap<>();
+
+    ConcurrentHashMap<Socket, ConcurrentLinkedQueue<Object>> outputQueueBySocket = new ConcurrentHashMap<>();
+
+    private final Set<Socket> activeConnections = ConcurrentHashMap.newKeySet();
 
     public TilemanServer(int portNumber) {
         this.portNumber = portNumber;
+        isServerRunning = true;
     }
 
     @Override
@@ -33,12 +44,11 @@ public class TilemanServer extends Thread {
             }
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            serverSocket = null;
         }
     }
 
     public void shutdown() {
+        isServerRunning = false;
         try {
             serverSocket.close();
         } catch (IOException e) {
@@ -47,13 +57,13 @@ public class TilemanServer extends Thread {
     }
 
     private void handleNewConnections(ServerSocket serverSocket) {
-        boolean running = true;
-        while (running) {
-            try(Socket connection = serverSocket.accept()) {
+        while (isServerRunning) {
+            try {
+                Socket connection = serverSocket.accept();
                 startConnectionThread(connection);
-            } catch (SocketException e) {
-              running = false;
-            } catch (IOException e) {}
+            } catch (IOException e){
+                e.printStackTrace();
+            }
         }
     }
 
@@ -64,6 +74,8 @@ public class TilemanServer extends Thread {
     }
 
     private void handleConnection(Socket connection) {
+        outputQueueBySocket.put(connection, new ConcurrentLinkedQueue<>());
+        activeConnections.add(connection);
         try {
             ObjectInputStream input = new ObjectInputStream(connection.getInputStream());
             ObjectOutputStream output = new ObjectOutputStream(connection.getOutputStream());
@@ -71,12 +83,15 @@ public class TilemanServer extends Thread {
             while (!connection.isClosed()) {
                 TilemanPacket packet = getNextPacket(input);
                 if (packet != null) {
-                    handlePacket(packet, output);
+                    handlePacket(packet, input, output);
                 }
                 sleep(5);
             }
         } catch (IOException | ClassNotFoundException | InterruptedException e) {
             e.printStackTrace();
+        } finally {
+            activeConnections.remove(connection);
+            outputQueueBySocket.remove(connection);
         }
     }
 
@@ -87,39 +102,66 @@ public class TilemanServer extends Thread {
         return null;
     }
 
-    private void handlePacket(TilemanPacket packet, ObjectOutputStream output) throws IOException {
+    private void handlePacket(TilemanPacket packet, ObjectInputStream input, ObjectOutputStream output) throws IOException, ClassNotFoundException {
         switch (packet.packetType) {
             case REGION_DATA_REQUEST:
                 handleRegionDataRequest(packet, output);
                 break;
+            case TILE_UPDATE:
+                handleTileUpdate(packet, input);
             default:
                 throw new IOException("Unexpected packet type in server: " + packet.packetType);
         }
     }
 
     private void handleRegionDataRequest(TilemanPacket packet, ObjectOutputStream output) throws IOException {
-        int regionId = Integer.valueOf(packet.message);
+        int regionId = Integer.parseInt(packet.message);
 
         Set<TilemanModeTile> tiles = gatherTilesInRegionForUser(packet.sender, regionId);
 
-        output.writeObject(TilemanPacket.CreateRegionDataResponse(TilemanPacket.SERVER, regionId));
+        output.writeObject(TilemanPacket.CreateRegionDataResponse(TilemanPacket.SERVER_ID, regionId));
         output.writeObject(tiles);
     }
 
-    private Set<TilemanModeTile> gatherTilesInRegionForUser(String username, int regionId) {
+    private void handleTileUpdate(TilemanPacket packet, ObjectInputStream input) throws IOException, ClassNotFoundException {
+        boolean state = Boolean.parseBoolean(packet.message);
+        TilemanModeTile tile = (TilemanModeTile)input.readObject();
+        if (state) {
+            playerTileData.get(packet.sender).get(tile.getRegionId()).add(tile);
+        } else {
+            playerTileData.get(packet.sender).get(tile.getRegionId()).remove(tile);
+        }
+
+        // Send the update to all connected players
+        TilemanPacket responsePacket = TilemanPacket.CreateTileUpdatePacket(TilemanPacket.SERVER_ID, state);
+        queueOutputForAllConnections(responsePacket, tile);
+    }
+
+    private Set<TilemanModeTile> gatherTilesInRegionForUser(long userId, int regionId) {
         Set<TilemanModeTile> gatheredRegionData = new HashSet<>();
 
-        for (String name : playerTileData.keySet()) {
-            if (name.equals(username)) {
+        for (long id : playerTileData.keySet()) {
+            if (id == userId) {
                 continue; // Skip sending a user their own tiles
             }
-            Set<TilemanModeTile> regionData = playerTileData.get(name).get(regionId);
+            Set<TilemanModeTile> regionData = playerTileData.get(id).get(regionId);
             gatheredRegionData.addAll(regionData);
         }
         return gatheredRegionData;
     }
 
-    private static void print(String string) {
-        System.out.println("Server: " + string);
+    private void queueOutputForAllConnections(TilemanPacket packet, Object... objects) {
+        for (Socket connection : activeConnections) {
+            queueOutputForConnection(connection, packet, objects);
+        }
+    }
+
+    private void queueOutputForConnection(Socket connection, TilemanPacket packet, Object... data) {
+        Queue<Object> outputQueue = outputQueueBySocket.get(connection);
+        outputQueue.add(packet);
+
+        if (data != null) {
+            Collections.addAll(outputQueue, data);
+        }
     }
 }

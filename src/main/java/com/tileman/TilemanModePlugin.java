@@ -30,6 +30,7 @@ import com.google.common.base.Strings;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.google.inject.Provides;
+import com.tileman.multiplayer.TilemanMultiplayerService;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -80,6 +81,8 @@ public class TilemanModePlugin extends Plugin {
     @Inject private TilemanModeWorldMapOverlay worldMapOverlay;
     @Inject private TileInfoOverlay infoOverlay;
     @Inject private ClientToolbar clientToolbar;
+
+    private TilemanPluginPanel pluginPanel;
 
     @Provides
     TilemanModeConfig provideConfig(ConfigManager configManager) {
@@ -153,6 +156,7 @@ public class TilemanModePlugin extends Plugin {
     @Subscribe
     public void onGameTick(GameTick tick) {
         autoMark();
+        updatePanel();
     }
 
     @Subscribe
@@ -197,12 +201,12 @@ public class TilemanModePlugin extends Plugin {
         loadPoints();
         updateTileCounter();
         log.debug("startup");
-        TilemanPluginPanel panel = new TilemanPluginPanel(this);
+        pluginPanel = new TilemanPluginPanel(this);
         NavigationButton navButton = NavigationButton.builder()
                 .tooltip("Tileman Import")
                 .icon(ImageUtil.getResourceStreamFromClass(getClass(), "/icon.png"))
                 .priority(70)
-                .panel(panel)
+                .panel(pluginPanel)
                 .build();
 
         clientToolbar.addNavigation(navButton);
@@ -217,6 +221,10 @@ public class TilemanModePlugin extends Plugin {
         overlayManager.remove(infoOverlay);
         tilesByRegion.forEach((key, val) -> val.clear());
         tilesByRegion.clear();
+    }
+
+    private void updatePanel() {
+        pluginPanel.rebuild();
     }
 
     private void autoMark() {
