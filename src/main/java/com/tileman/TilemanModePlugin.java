@@ -611,6 +611,7 @@ public class TilemanModePlugin extends Plugin {
     int getXpUntilNextTile() {
         return xpUntilNextTile;
     }
+    public Client getClient() { return client; }
 
     @AllArgsConstructor
     enum MovementFlag {
@@ -641,5 +642,6 @@ public class TilemanModePlugin extends Plugin {
                     .collect(Collectors.toSet());
         }
     }
+
 
 }

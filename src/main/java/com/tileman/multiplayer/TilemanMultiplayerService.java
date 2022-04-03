@@ -1,5 +1,9 @@
 package com.tileman.multiplayer;
 
+import net.runelite.api.Client;
+
+import java.math.BigInteger;
+
 public class TilemanMultiplayerService {
     private static TilemanServer server;
     private static TilemanClient serverClient;
@@ -18,13 +22,13 @@ public class TilemanMultiplayerService {
         }
     }
 
-    public static void connect(String hostname, int port) {
+    public static void connect(Client client, String hostname, int port) {
         validateHostname(hostname);
         if (serverClient != null && serverClient.isAlive()) {
             return;
         }
 
-        serverClient = new TilemanClient(hostname, port);
+        serverClient = new TilemanClient(client, hostname, port);
         serverClient.start();
     }
 

@@ -1,18 +1,23 @@
 package com.tileman.multiplayer;
 
-import lombok.Getter;
-import lombok.Setter;
-import org.apache.commons.lang3.NotImplementedException;
+import com.tileman.TilemanModeTile;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class TilemanServer extends Thread {
 
     private int portNumber;
     private ServerSocket serverSocket;
+
+    // Data structure gore, I'm sorry.
+    // It's each username's individual tile data, mapped by region id, stored in sets.
+    ConcurrentHashMap<String, ConcurrentSetMap<Integer, TilemanModeTile>> playerTileData = new ConcurrentHashMap<>();
 
     public TilemanServer(int portNumber) {
         this.portNumber = portNumber;
@@ -44,8 +49,7 @@ public class TilemanServer extends Thread {
     private void handleNewConnections(ServerSocket serverSocket) {
         boolean running = true;
         while (running) {
-            try {
-                Socket connection = serverSocket.accept();
+            try(Socket connection = serverSocket.accept()) {
                 startConnectionThread(connection);
             } catch (SocketException e) {
               running = false;
@@ -61,18 +65,58 @@ public class TilemanServer extends Thread {
 
     private void handleConnection(Socket connection) {
         try {
-            ObjectInputStream inputStream = new ObjectInputStream(connection.getInputStream());
-            ObjectOutputStream outputStream = new ObjectOutputStream(connection.getOutputStream());
+            ObjectInputStream input = new ObjectInputStream(connection.getInputStream());
+            ObjectOutputStream output = new ObjectOutputStream(connection.getOutputStream());
 
-            TilemanPacket packet = (TilemanPacket)inputStream.readObject();
-            print("Received [" + packet.message + "]");
-
-            outputStream.writeObject(new TilemanPacket("Nm, you?"));
-
-            connection.close();
-        } catch (IOException | ClassNotFoundException e) {
+            while (!connection.isClosed()) {
+                TilemanPacket packet = getNextPacket(input);
+                if (packet != null) {
+                    handlePacket(packet, output);
+                }
+                sleep(5);
+            }
+        } catch (IOException | ClassNotFoundException | InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    private TilemanPacket getNextPacket(ObjectInputStream input) throws IOException, ClassNotFoundException {
+        if (input.available() > 0) {
+            return (TilemanPacket)input.readObject();
+        }
+        return null;
+    }
+
+    private void handlePacket(TilemanPacket packet, ObjectOutputStream output) throws IOException {
+        switch (packet.packetType) {
+            case REGION_DATA_REQUEST:
+                handleRegionDataRequest(packet, output);
+                break;
+            default:
+                throw new IOException("Unexpected packet type in server: " + packet.packetType);
+        }
+    }
+
+    private void handleRegionDataRequest(TilemanPacket packet, ObjectOutputStream output) throws IOException {
+        int regionId = Integer.valueOf(packet.message);
+
+        Set<TilemanModeTile> tiles = gatherTilesInRegionForUser(packet.sender, regionId);
+
+        output.writeObject(TilemanPacket.CreateRegionDataResponse(TilemanPacket.SERVER, regionId));
+        output.writeObject(tiles);
+    }
+
+    private Set<TilemanModeTile> gatherTilesInRegionForUser(String username, int regionId) {
+        Set<TilemanModeTile> gatheredRegionData = new HashSet<>();
+
+        for (String name : playerTileData.keySet()) {
+            if (name.equals(username)) {
+                continue; // Skip sending a user their own tiles
+            }
+            Set<TilemanModeTile> regionData = playerTileData.get(name).get(regionId);
+            gatheredRegionData.addAll(regionData);
+        }
+        return gatheredRegionData;
     }
 
     private static void print(String string) {

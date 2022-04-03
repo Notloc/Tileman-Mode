@@ -26,12 +26,13 @@
 package com.tileman;
 
 import lombok.Value;
+import java.io.Serializable;
 
 /**
  * Used for serialization of ground marker points.
  */
 @Value
-class TilemanModeTile
+public class TilemanModeTile implements Serializable
 {
 	private int regionId;
 	private int regionX;
