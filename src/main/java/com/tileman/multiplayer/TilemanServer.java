@@ -189,7 +189,7 @@ public class TilemanServer extends Thread implements IShutdown {
 
     private void addTileData(long playerId, int regionId, List<TilemanModeTile> tiles) {
         ensurePlayerEntry(playerId);
-        playerTileData.get(playerId).get(regionId).addAll(tiles);
+        playerTileData.get(playerId).addAll(regionId, tiles);
     }
 
     private Set<TilemanModeTile> gatherTilesInRegionForUser(long userId, int regionId) {
