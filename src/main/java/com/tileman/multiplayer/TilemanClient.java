@@ -56,9 +56,7 @@ public class TilemanClient extends Thread {
 
             requestRegionData(client.getMapRegions());
             while (stayConnected) {
-                while (queuedPacketsAndData.peek() != null) {
-                    output.writeObject(queuedPacketsAndData.remove());
-                }
+                handleQueueData(output);
 
                 TilemanPacket packet = getNextPacket(input);
                 if (packet != null) {
@@ -73,6 +71,17 @@ public class TilemanClient extends Thread {
             clientState = ClientState.DISCONNECTED;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
         }
+    }
+
+    private void handleQueueData(ObjectOutputStream output) throws IOException {
+        if (queuedPacketsAndData.peek() == null) {
+            return;
+        }
+
+        while (queuedPacketsAndData.peek() != null) {
+            output.writeObject(queuedPacketsAndData.remove());
+        }
+        output.flush();
     }
 
     private TilemanPacket getNextPacket(ObjectInputStream input) throws IOException, ClassNotFoundException {

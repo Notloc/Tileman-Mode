@@ -116,6 +116,7 @@ public class TilemanServer extends Thread {
             default:
                 throw new IOException("Unexpected packet type in server: " + packet.packetType);
         }
+        output.flush();
     }
 
     private void handleRegionDataRequest(TilemanPacket packet, ObjectOutputStream output) throws IOException {
