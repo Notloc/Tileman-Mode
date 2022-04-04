@@ -106,15 +106,10 @@ public class TilemanClient extends Thread implements IShutdown {
         }
     }
 
-    private void handleIncomingRegionData(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException {
+    private void handleIncomingRegionData(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, ShutdownException {
         int regionId = Integer.parseInt(packet.message);
-        while (stayConnected) {
-            Object object = input.getNextObject();
-            if (object == null) {
-                sleep(10);
-                continue;
-            }
-
+        while (!isShutdown()) {
+            Object object = input.waitForData(this);
             if (object instanceof List) {
                 List<TilemanModeTile> tiles = (List<TilemanModeTile>) object;
                 multiplayerTileData.addAll(regionId, tiles);
