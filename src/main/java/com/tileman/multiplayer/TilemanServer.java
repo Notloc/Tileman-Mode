@@ -6,14 +6,11 @@ import lombok.Getter;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class TilemanServer extends Thread {
+public class TilemanServer extends Thread implements IShutdown {
 
     @Getter
     private final int portNumber;
@@ -33,6 +30,8 @@ public class TilemanServer extends Thread {
         this.portNumber = portNumber;
         isServerRunning = true;
     }
+
+    public boolean isShutdown() { return !isServerRunning; }
 
     @Override
     public void run() {
@@ -79,35 +78,46 @@ public class TilemanServer extends Thread {
         outputQueueBySocket.put(connection, new ConcurrentLinkedQueue<>());
         activeConnections.add(connection);
         TilemanMultiplayerService.invokeMultiplayerStateChanged();
+
+        ObjectInputStreamBufferThread inputThread = null;
+
         try {
             ObjectOutputStream output = new ObjectOutputStream(connection.getOutputStream());
-            output.flush();
-            ObjectInputStream input = new ObjectInputStream(connection.getInputStream());
+            inputThread = new ObjectInputStreamBufferThread(connection.getInputStream());
+            inputThread.start();
 
             while (!connection.isClosed()) {
-                TilemanPacket packet = getNextPacket(input);
+                TilemanPacket packet = inputThread.getNextPacket();
                 if (packet != null) {
-                    handlePacket(packet, input, output);
+                    handlePacket(packet, inputThread, output);
                 }
-                sleep(5);
+                sleep(50);
             }
+        } catch (ShutdownException e) {
+            // Do nothing
         } catch (IOException | ClassNotFoundException | InterruptedException e) {
             e.printStackTrace();
         } finally {
             activeConnections.remove(connection);
             outputQueueBySocket.remove(connection);
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
+
+            if (inputThread != null) {
+                inputThread.teardown();
+            }
         }
     }
 
     private TilemanPacket getNextPacket(ObjectInputStream input) throws IOException, ClassNotFoundException {
-        if (input.available() > 0) {
-            return (TilemanPacket)input.readObject();
+        try {
+            TilemanPacket packet = (TilemanPacket)input.readObject();
+            return packet;
+        } catch (EOFException e) {
+            return null;
         }
-        return null;
     }
 
-    private void handlePacket(TilemanPacket packet, ObjectInputStream input, ObjectOutputStream output) throws IOException, ClassNotFoundException {
+    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input, ObjectOutputStream output) throws IOException, ClassNotFoundException, ShutdownException, InterruptedException {
         switch (packet.packetType) {
             case REGION_DATA_REQUEST:
                 handleRegionDataRequest(packet, output);
@@ -123,15 +133,22 @@ public class TilemanServer extends Thread {
     private void handleRegionDataRequest(TilemanPacket packet, ObjectOutputStream output) throws IOException {
         int regionId = Integer.parseInt(packet.message);
 
-        Set<TilemanModeTile> tiles = gatherTilesInRegionForUser(packet.sender, regionId);
-
-        output.writeObject(TilemanPacket.CreateRegionDataResponse(TilemanPacket.SERVER_ID, regionId));
+        Set<TilemanModeTile> tileSet = gatherTilesInRegionForUser(packet.sender, regionId);
+        List<TilemanModeTile> tiles = new ArrayList<>();
+        for (TilemanModeTile tile : tileSet) {
+            tiles.add(tile);
+        }
+        output.writeObject(TilemanPacket.createRegionDataResponse(TilemanPacket.SERVER_ID, regionId));
         output.writeObject(tiles);
+        output.writeObject(TilemanPacket.createEndOfDataPacket(TilemanPacket.SERVER_ID));
     }
 
-    private void handleTileUpdate(TilemanPacket packet, ObjectInputStream input) throws IOException, ClassNotFoundException {
+    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, ShutdownException {
         boolean state = Boolean.parseBoolean(packet.message);
-        TilemanModeTile tile = (TilemanModeTile)input.readObject();
+
+        Object object = input.waitForData(this);
+        TilemanModeTile tile = (TilemanModeTile)object;
+
         if (state) {
             playerTileData.get(packet.sender).get(tile.getRegionId()).add(tile);
         } else {
@@ -139,7 +156,7 @@ public class TilemanServer extends Thread {
         }
 
         // Send the update to all connected players
-        TilemanPacket responsePacket = TilemanPacket.CreateTileUpdatePacket(TilemanPacket.SERVER_ID, state);
+        TilemanPacket responsePacket = TilemanPacket.createTileUpdatePacket(TilemanPacket.SERVER_ID, state);
         queueOutputForAllConnections(responsePacket, tile);
     }
 
