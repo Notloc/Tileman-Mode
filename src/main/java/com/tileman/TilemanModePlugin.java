@@ -69,7 +69,7 @@ public class TilemanModePlugin extends Plugin {
     private static final Gson GSON = new Gson();
     private final Set<Integer> tutorialIslandRegionIds = Util.set(12079, 12080, 12335, 12336, 12592);
 
-    @Getter(AccessLevel.PACKAGE)
+    @Getter(AccessLevel.PUBLIC)
     private final Map<Integer, List<TilemanModeTile>> tilesByRegion = new HashMap<>();
 
     @Inject private Client client;

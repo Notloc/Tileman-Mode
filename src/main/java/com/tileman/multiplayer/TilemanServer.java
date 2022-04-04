@@ -2,6 +2,7 @@ package com.tileman.multiplayer;
 
 import com.tileman.TilemanModeTile;
 import lombok.Getter;
+import net.runelite.api.Tile;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -95,7 +96,7 @@ public class TilemanServer extends Thread implements IShutdown {
             }
         } catch (ShutdownException e) {
             // Do nothing
-        } catch (IOException | ClassNotFoundException | InterruptedException e) {
+        } catch (IOException | ClassNotFoundException | InterruptedException | UnexpectedPacketTypeException e) {
             e.printStackTrace();
         } finally {
             activeConnections.remove(connection);
@@ -117,13 +118,16 @@ public class TilemanServer extends Thread implements IShutdown {
         }
     }
 
-    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input, ObjectOutputStream output) throws IOException, ClassNotFoundException, ShutdownException, InterruptedException {
+    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input, ObjectOutputStream output) throws IOException, ClassNotFoundException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
         switch (packet.packetType) {
             case REGION_DATA_REQUEST:
                 handleRegionDataRequest(packet, output);
                 break;
             case TILE_UPDATE:
                 handleTileUpdate(packet, input);
+            case REGION_DATA_RESPONSE:
+                handleRegionDataResponse(packet, input);
+                break;
             default:
                 throw new IOException("Unexpected packet type in server: " + packet.packetType);
         }
@@ -141,6 +145,19 @@ public class TilemanServer extends Thread implements IShutdown {
         output.writeObject(TilemanPacket.createRegionDataResponse(TilemanPacket.SERVER_ID, regionId));
         output.writeObject(tiles);
         output.writeObject(TilemanPacket.createEndOfDataPacket(TilemanPacket.SERVER_ID));
+    }
+
+    private void handleRegionDataResponse(TilemanPacket packet, ObjectInputStreamBufferThread input) throws ShutdownException, InterruptedException, UnexpectedPacketTypeException {
+        int regionId = Integer.parseInt(packet.message);
+
+        while (!isShutdown()) {
+            Object object = input.waitForData(this);
+            if (object instanceof List) {
+
+            } else {
+                validateEndOfDataPacket(object);
+            }
+        }
     }
 
     private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, ShutdownException {
@@ -186,5 +203,15 @@ public class TilemanServer extends Thread implements IShutdown {
         if (data != null) {
             Collections.addAll(outputQueue, data);
         }
+    }
+
+    private static void validateEndOfDataPacket(Object data) throws UnexpectedPacketTypeException {
+        if (data instanceof TilemanPacket) {
+            TilemanPacket packet = (TilemanPacket) data;
+            if (packet.packetType != PacketType.END_OF_DATA) {
+                throw new UnexpectedPacketTypeException("Expected an END_OF_DATA packet. Received " + packet.packetType + " packet.");
+            }
+        }
+        throw new UnexpectedPacketTypeException("Expected an END_OF_DATA packet. Received object: " + data.getClass().getSimpleName());
     }
 }

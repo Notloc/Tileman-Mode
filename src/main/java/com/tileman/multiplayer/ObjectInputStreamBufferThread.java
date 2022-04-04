@@ -84,5 +84,4 @@ public class ObjectInputStreamBufferThread extends Thread {
         Thread thread = new Thread(stopIfNeeded);
         thread.start();
     }
-
 }
