@@ -153,7 +153,8 @@ public class TilemanServer extends Thread implements IShutdown {
         while (!isShutdown()) {
             Object object = input.waitForData(this);
             if (object instanceof List) {
-
+                List<TilemanModeTile> tiles = (List<TilemanModeTile>)object;
+                addTileData(packet.sender, regionId, tiles);
             } else {
                 validateEndOfDataPacket(object);
                 break;
@@ -167,6 +168,8 @@ public class TilemanServer extends Thread implements IShutdown {
         Object object = input.waitForData(this);
         TilemanModeTile tile = (TilemanModeTile)object;
 
+        ensurePlayerEntry(packet.sender);
+
         if (state) {
             playerTileData.get(packet.sender).get(tile.getRegionId()).add(tile);
         } else {
@@ -176,6 +179,17 @@ public class TilemanServer extends Thread implements IShutdown {
         // Send the update to all connected players
         TilemanPacket responsePacket = TilemanPacket.createTileUpdatePacket(TilemanPacket.SERVER_ID, state);
         queueOutputForAllConnections(responsePacket, tile);
+    }
+
+    private void ensurePlayerEntry(long playerId) {
+        if (!playerTileData.containsKey(playerId)) {
+            playerTileData.put(playerId, new ConcurrentSetMap<>());
+        }
+    }
+
+    private void addTileData(long playerId, int regionId, List<TilemanModeTile> tiles) {
+        ensurePlayerEntry(playerId);
+        playerTileData.get(playerId).get(regionId).addAll(tiles);
     }
 
     private Set<TilemanModeTile> gatherTilesInRegionForUser(long userId, int regionId) {
