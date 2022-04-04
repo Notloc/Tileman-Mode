@@ -80,8 +80,9 @@ public class TilemanServer extends Thread {
         activeConnections.add(connection);
         TilemanMultiplayerService.invokeMultiplayerStateChanged();
         try {
-            ObjectInputStream input = new ObjectInputStream(connection.getInputStream());
             ObjectOutputStream output = new ObjectOutputStream(connection.getOutputStream());
+            output.flush();
+            ObjectInputStream input = new ObjectInputStream(connection.getInputStream());
 
             while (!connection.isClosed()) {
                 TilemanPacket packet = getNextPacket(input);

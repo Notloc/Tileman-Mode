@@ -42,6 +42,7 @@ public class TilemanClient extends Thread {
 
         try(Socket socket = new Socket(hostname, portNumber)) {
             ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
+            output.flush();
             ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
 
             clientState = ClientState.SYNCING;
