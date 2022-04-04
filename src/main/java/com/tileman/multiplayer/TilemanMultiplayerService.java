@@ -1,6 +1,7 @@
 package com.tileman.multiplayer;
 
 import com.tileman.TilemanModeOverlay;
+import com.tileman.TilemanModePlugin;
 import com.tileman.TilemanModeTile;
 import net.runelite.api.Client;
 
@@ -37,14 +38,14 @@ public class TilemanMultiplayerService {
         return server != null ? server.getPortNumber() : -1;
     }
 
-    public static void startServer(Client client, int port) {
+    public static void startServer(Client client, TilemanModePlugin plugin, int port) {
         if (server != null && server.isAlive()) {
             return;
         }
         server = new TilemanServer(port);
         server.start();
 
-        connect(client, "localhost", port);
+        connect(client, plugin, "localhost", port);
     }
 
     public static void stopServer() {
@@ -54,12 +55,12 @@ public class TilemanMultiplayerService {
         invokeMultiplayerStateChanged();
     }
 
-    public static void connect(Client client, String hostname, int port) {
+    public static void connect(Client client, TilemanModePlugin plugin, String hostname, int port) {
         if (serverClient != null && serverClient.isAlive()) {
             return;
         }
 
-        serverClient = new TilemanClient(client, hostname, port);
+        serverClient = new TilemanClient(client, plugin, hostname, port);
         serverClient.start();
     }
 

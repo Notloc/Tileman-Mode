@@ -76,11 +76,11 @@ public class TilemanPluginPanel extends PluginPanel {
                     multiplayerPanel.add(ipInput);
 
                     JButton connectButton = new JButton("Connect");
-                    connectButton.addActionListener(e -> TilemanMultiplayerService.connect(plugin.getClient(), ipInput.getText(), PORT));
+                    connectButton.addActionListener(e -> TilemanMultiplayerService.connect(plugin.getClient(), plugin, ipInput.getText(), PORT));
                     multiplayerPanel.add(connectButton);
 
                     JButton startServerButton = new JButton("Launch Server");
-                    startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(plugin.getClient(), PORT));
+                    startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(plugin.getClient(), plugin, PORT));
                     multiplayerPanel.add(startServerButton);
 
                     multiplayerPanel.add(Box.createVerticalStrut(20));
