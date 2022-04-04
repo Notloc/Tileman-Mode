@@ -1,15 +1,29 @@
 package com.tileman.multiplayer;
 
+import com.tileman.TilemanModeOverlay;
+import com.tileman.TilemanModeTile;
 import net.runelite.api.Client;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Function;
 
 public class TilemanMultiplayerService {
     private static TilemanServer server;
     private static TilemanClient serverClient;
 
+    /**
+     * Event for when the multiplayer state changes (i.e. server goes up/down, client connects/disconnects)
+     * NOT CALLED ON MAIN THREAD
+     */
+    public static Collection<Runnable> onMultiplayerStateChanged = new ConcurrentLinkedQueue<>();
+
     public static boolean isHosting() {
-        return server != null && server.isAlive();
+        return server != null && server.isAlive() && server.isServerRunning;
     }
     public static boolean isConnected() {
         return serverClient != null && serverClient.isAlive() && serverClient.clientState == ClientState.CONNECTED;
@@ -37,10 +51,10 @@ public class TilemanMultiplayerService {
         if (server.isAlive()) {
             server.shutdown();
         }
+        invokeMultiplayerStateChanged();
     }
 
     public static void connect(Client client, String hostname, int port) {
-        validateHostname(hostname);
         if (serverClient != null && serverClient.isAlive()) {
             return;
         }
@@ -50,10 +64,16 @@ public class TilemanMultiplayerService {
     }
 
     public static void disconnect() {
-        //serverClient.disconnect();
+        serverClient.disconnect();
     }
 
-    private static void validateHostname(String hostname) {
-        // TODO: validate ip format? DNS/localhost
+    static void invokeMultiplayerStateChanged() {
+        for (Runnable runnable : onMultiplayerStateChanged) {
+            runnable.run();
+        }
+    }
+
+    public static ConcurrentSetMap<Integer, TilemanModeTile> getMultiplayerTileData() {
+        return serverClient.multiplayerTileData;
     }
 }

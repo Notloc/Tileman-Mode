@@ -18,7 +18,7 @@ public class TilemanClient extends Thread {
     private final int portNumber;
 
     private final ConcurrentLinkedQueue<Object> queuedPacketsAndData = new ConcurrentLinkedQueue<>();
-    private final ConcurrentSetMap<Integer, TilemanModeTile> serverTileData = new ConcurrentSetMap<>();
+    final ConcurrentSetMap<Integer, TilemanModeTile> multiplayerTileData = new ConcurrentSetMap<>();
 
     private TilemanPacket cachedPacket;
     private boolean stayConnected;
@@ -45,14 +45,16 @@ public class TilemanClient extends Thread {
             ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
 
             clientState = ClientState.SYNCING;
+            TilemanMultiplayerService.invokeMultiplayerStateChanged();
             //TODO: sync tile data before beginning normal operation
             //      send ALL your tiles for other players
             //      (use hashing to determine what can be skipped, server should save ur profile/tiles from prev connections,
             //          so you don't need to be logged in for others to use your tiles.)
 
             clientState = ClientState.CONNECTED;
-            requestRegionData(client.getMapRegions());
+            TilemanMultiplayerService.invokeMultiplayerStateChanged();
 
+            requestRegionData(client.getMapRegions());
             while (stayConnected) {
                 while (queuedPacketsAndData.peek() != null) {
                     output.writeObject(queuedPacketsAndData.remove());
@@ -69,6 +71,7 @@ public class TilemanClient extends Thread {
             e.printStackTrace();
         } finally {
             clientState = ClientState.DISCONNECTED;
+            TilemanMultiplayerService.invokeMultiplayerStateChanged();
         }
     }
 
@@ -103,7 +106,7 @@ public class TilemanClient extends Thread {
             Object object = input.readObject();
             if (object instanceof List) {
                 List<TilemanModeTile> tiles = (List<TilemanModeTile>)object;
-                serverTileData.addAll(regionId, tiles);
+                multiplayerTileData.addAll(regionId, tiles);
             } else {
                 cachedPacket = (TilemanPacket)object;
                 break;
@@ -114,12 +117,12 @@ public class TilemanClient extends Thread {
     private void handleTileUpdate(TilemanPacket packet, ObjectInputStream input) throws IOException, ClassNotFoundException {
         Object object = input.readObject();
         TilemanModeTile tile = (TilemanModeTile)object;
-        if (serverTileData.containsKey(tile.getRegionId())) {
+        if (multiplayerTileData.containsKey(tile.getRegionId())) {
             boolean tileState = Boolean.parseBoolean(packet.message);
             if (tileState) {
-                serverTileData.add(tile.getRegionId(), tile);
+                multiplayerTileData.add(tile.getRegionId(), tile);
             } else {
-                serverTileData.remove(tile.getRegionId(), tile);
+                multiplayerTileData.remove(tile.getRegionId(), tile);
             }
         }
     }

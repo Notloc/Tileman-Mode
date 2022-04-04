@@ -156,7 +156,6 @@ public class TilemanModePlugin extends Plugin {
     @Subscribe
     public void onGameTick(GameTick tick) {
         autoMark();
-        updatePanel();
     }
 
     @Subscribe
@@ -209,6 +208,8 @@ public class TilemanModePlugin extends Plugin {
                 .panel(pluginPanel)
                 .build();
 
+        TilemanMultiplayerService.onMultiplayerStateChanged.add(() -> pluginPanel.rebuild());
+
         clientToolbar.addNavigation(navButton);
     }
 
@@ -221,10 +222,6 @@ public class TilemanModePlugin extends Plugin {
         overlayManager.remove(infoOverlay);
         tilesByRegion.forEach((key, val) -> val.clear());
         tilesByRegion.clear();
-    }
-
-    private void updatePanel() {
-        pluginPanel.rebuild();
     }
 
     private void autoMark() {

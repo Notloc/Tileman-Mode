@@ -26,6 +26,8 @@
  */
 package com.tileman;
 
+import com.tileman.multiplayer.ConcurrentSetMap;
+import com.tileman.multiplayer.TilemanMultiplayerService;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
 import net.runelite.api.coords.LocalPoint;
@@ -69,22 +71,33 @@ public class TilemanModeOverlay extends Overlay
 		for (int region : loadedRegions)
 		{
 			List<TilemanModeTile> tiles = tilesByRegion.get(region);
-			worldPointBuffer.clear();
-			Util.translateTilesToWorldPoints(client, tiles, worldPointBuffer);
+			renderTiles(graphics, tiles, color);
+		}
 
-			for (final WorldPoint point : worldPointBuffer)
+		if (TilemanMultiplayerService.isConnected())
+		{
+			ConcurrentSetMap<Integer, TilemanModeTile> multiplayerTileData = TilemanMultiplayerService.getMultiplayerTileData();
+			for (int region : loadedRegions)
 			{
-				if (point.getPlane() != client.getPlane())
-				{
-					continue;
-				}
-
-				drawTile(graphics, point, color);
+				Collection<TilemanModeTile> tiles = multiplayerTileData.get(region);
+				renderTiles(graphics, tiles, color);
 			}
 		}
 
-
 		return null;
+	}
+
+	private void renderTiles(Graphics2D graphics, Collection<TilemanModeTile> tiles, Color color) {
+		worldPointBuffer.clear();
+		Util.translateTilesToWorldPoints(client, tiles, worldPointBuffer);
+
+		for (final WorldPoint point : worldPointBuffer)
+		{
+			if (point.getPlane() != client.getPlane()) {
+				continue;
+			}
+			drawTile(graphics, point, color);
+		}
 	}
 
 	private void drawTile(Graphics2D graphics, WorldPoint point, Color color)

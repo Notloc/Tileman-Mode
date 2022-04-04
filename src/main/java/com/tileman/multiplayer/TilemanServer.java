@@ -19,7 +19,7 @@ public class TilemanServer extends Thread {
     private final int portNumber;
     private ServerSocket serverSocket;
 
-    private boolean isServerRunning;
+    boolean isServerRunning;
 
     // Data structure gore, I'm sorry.
     // It's a thread safe map by userHash of each user's tile data. Tile data is mapped by region and stored in hashsets.
@@ -38,6 +38,7 @@ public class TilemanServer extends Thread {
     public void run() {
         try {
             serverSocket = new ServerSocket(portNumber);
+            TilemanMultiplayerService.invokeMultiplayerStateChanged();
             handleNewConnections(serverSocket);
             if (!serverSocket.isClosed()) {
                 serverSocket.close();
@@ -54,6 +55,7 @@ public class TilemanServer extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        TilemanMultiplayerService.invokeMultiplayerStateChanged();
     }
 
     private void handleNewConnections(ServerSocket serverSocket) {
@@ -76,6 +78,7 @@ public class TilemanServer extends Thread {
     private void handleConnection(Socket connection) {
         outputQueueBySocket.put(connection, new ConcurrentLinkedQueue<>());
         activeConnections.add(connection);
+        TilemanMultiplayerService.invokeMultiplayerStateChanged();
         try {
             ObjectInputStream input = new ObjectInputStream(connection.getInputStream());
             ObjectOutputStream output = new ObjectOutputStream(connection.getOutputStream());
@@ -92,6 +95,7 @@ public class TilemanServer extends Thread {
         } finally {
             activeConnections.remove(connection);
             outputQueueBySocket.remove(connection);
+            TilemanMultiplayerService.invokeMultiplayerStateChanged();
         }
     }
 
