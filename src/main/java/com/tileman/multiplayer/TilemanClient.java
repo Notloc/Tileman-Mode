@@ -130,6 +130,7 @@ public class TilemanClient extends Thread implements IShutdown {
                 multiplayerTileData.addAll(regionId, tiles);
             } else {
                 validateEndOfDataPacket(object);
+                break;
             }
         }
     }
@@ -169,6 +170,7 @@ public class TilemanClient extends Thread implements IShutdown {
             if (packet.packetType != PacketType.END_OF_DATA) {
                 throw new UnexpectedPacketTypeException("Expected an END_OF_DATA packet. Received " + packet.packetType + " packet.");
             }
+            return;
         }
         throw new UnexpectedPacketTypeException("Expected an END_OF_DATA packet. Received object: " + data.getClass().getSimpleName());
     }

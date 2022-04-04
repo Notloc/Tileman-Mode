@@ -156,6 +156,7 @@ public class TilemanServer extends Thread implements IShutdown {
 
             } else {
                 validateEndOfDataPacket(object);
+                break;
             }
         }
     }
@@ -211,6 +212,7 @@ public class TilemanServer extends Thread implements IShutdown {
             if (packet.packetType != PacketType.END_OF_DATA) {
                 throw new UnexpectedPacketTypeException("Expected an END_OF_DATA packet. Received " + packet.packetType + " packet.");
             }
+            return;
         }
         throw new UnexpectedPacketTypeException("Expected an END_OF_DATA packet. Received object: " + data.getClass().getSimpleName());
     }
