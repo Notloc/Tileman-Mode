@@ -1,17 +1,14 @@
 package com.tileman.multiplayer;
 
-import com.tileman.TilemanModeOverlay;
 import com.tileman.TilemanModePlugin;
 import com.tileman.TilemanModeTile;
+import com.tileman.multiplayer.client.TilemanClient;
+import com.tileman.multiplayer.client.TilemanClientState;
+import com.tileman.multiplayer.server.TilemanServer;
 import net.runelite.api.Client;
 
-import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.Function;
 
 public class TilemanMultiplayerService {
     private static TilemanServer server;
@@ -24,14 +21,14 @@ public class TilemanMultiplayerService {
     public static Collection<Runnable> onMultiplayerStateChanged = new ConcurrentLinkedQueue<>();
 
     public static boolean isHosting() {
-        return server != null && server.isAlive() && server.isServerRunning;
+        return server != null && server.isAlive() && !server.isShutdown();
     }
     public static boolean isConnected() {
-        return serverClient != null && serverClient.isAlive() && serverClient.clientState == ClientState.CONNECTED;
+        return serverClient != null && serverClient.isAlive() && serverClient.getClientState() == TilemanClientState.CONNECTED;
     }
 
     public static boolean isSyncing() {
-        return serverClient != null && serverClient.isAlive() && serverClient.clientState == ClientState.SYNCING;
+        return serverClient != null && serverClient.isAlive() && serverClient.getClientState() == TilemanClientState.SYNCING;
     }
 
     public static int getServerPort() {
@@ -68,13 +65,19 @@ public class TilemanMultiplayerService {
         serverClient.disconnect();
     }
 
-    static void invokeMultiplayerStateChanged() {
+    public static void invokeMultiplayerStateChanged() {
         for (Runnable runnable : onMultiplayerStateChanged) {
             runnable.run();
         }
     }
 
     public static ConcurrentSetMap<Integer, TilemanModeTile> getMultiplayerTileData() {
-        return serverClient.multiplayerTileData;
+        return serverClient.getMultiplayerTileData();
+    }
+
+    public static void sendMultiplayerTileUpdate(TilemanModeTile tile, boolean state) {
+        if (isConnected()) {
+            serverClient.sendTileUpdate(tile, state);
+        }
     }
 }

@@ -1,8 +1,10 @@
-package com.tileman.multiplayer;
+package com.tileman.multiplayer.client;
 
 import com.tileman.TilemanModePlugin;
 import com.tileman.TilemanModeTile;
 import com.tileman.Util;
+import com.tileman.multiplayer.*;
+import lombok.Getter;
 import net.runelite.api.Client;
 
 import java.io.IOException;
@@ -12,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class TilemanClient extends Thread implements IShutdown {
+public class TilemanClient extends NetworkedThread {
 
     private final Client client;
     private final TilemanModePlugin plugin;
@@ -20,13 +22,10 @@ public class TilemanClient extends Thread implements IShutdown {
     private final String hostname;
     private final int portNumber;
 
-    private final ConcurrentLinkedQueue<Object> queuedPacketsAndData = new ConcurrentLinkedQueue<>();
-    final ConcurrentSetMap<Integer, TilemanModeTile> multiplayerTileData = new ConcurrentSetMap<>();
-
-    private boolean stayConnected;
-
-    ClientState clientState;
-
+    @Getter
+    private final ConcurrentSetMap<Integer, TilemanModeTile> multiplayerTileData = new ConcurrentSetMap<>();
+    private final ConcurrentLinkedQueue<Object> outputQueue = new ConcurrentLinkedQueue<>();
+    private TilemanClientState clientState;
 
     public TilemanClient(Client client, TilemanModePlugin plugin, String hostname, int portNumber) {
         this.client = client;
@@ -34,11 +33,10 @@ public class TilemanClient extends Thread implements IShutdown {
 
         this.hostname = hostname;
         this.portNumber = portNumber;
-        this.clientState = ClientState.CONNECTING;
-        this.stayConnected = true;
+        this.clientState = TilemanClientState.CONNECTING;
     }
 
-    public boolean isShutdown() { return !stayConnected; }
+    public TilemanClientState getClientState() { return clientState; }
 
     @Override
     public void run() {
@@ -55,16 +53,16 @@ public class TilemanClient extends Thread implements IShutdown {
             ObjectInputStreamBufferThread inputThread = new ObjectInputStreamBufferThread(socket.getInputStream());
             inputThread.start();
 
-            clientState = ClientState.SYNCING;
+            clientState = TilemanClientState.SYNCING;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
 
             uploadTileDataToServer(plugin.getTilesByRegion(), output);
 
-            clientState = ClientState.CONNECTED;
+            clientState = TilemanClientState.CONNECTED;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
 
             requestRegionData(client.getMapRegions());
-            while (stayConnected) {
+            while (!isShutdown()) {
                 handleOutputQueue(output);
 
                 TilemanPacket packet = inputThread.getNextPacket();
@@ -82,7 +80,7 @@ public class TilemanClient extends Thread implements IShutdown {
         catch (IOException | ClassNotFoundException | InterruptedException | UnexpectedPacketTypeException e) {
             e.printStackTrace();
         } finally {
-            clientState = ClientState.DISCONNECTED;
+            clientState = TilemanClientState.DISCONNECTED;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
         }
     }
@@ -98,12 +96,12 @@ public class TilemanClient extends Thread implements IShutdown {
     }
 
     private void handleOutputQueue(ObjectOutputStream output) throws IOException {
-        if (queuedPacketsAndData.peek() == null) {
+        if (outputQueue.peek() == null) {
             return;
         }
 
-        while (queuedPacketsAndData.peek() != null) {
-            output.writeObject(queuedPacketsAndData.remove());
+        while (outputQueue.peek() != null) {
+            output.writeObject(outputQueue.remove());
         }
         output.flush();
     }
@@ -151,34 +149,18 @@ public class TilemanClient extends Thread implements IShutdown {
 
     public void requestRegionData(int[] regionIds) {
         for (int regionId : regionIds) {
-            queuedPacketsAndData.add(TilemanPacket.createRegionDataRequest(client.getAccountHash(), regionId));
+            outputQueue.add(TilemanPacket.createRegionDataRequest(client.getAccountHash(), regionId));
         }
     }
 
     public void sendTileUpdate(TilemanModeTile tile, boolean state) {
-        queuedPacketsAndData.add(TilemanPacket.createTileUpdatePacket(client.getAccountHash(), state));
-        queuedPacketsAndData.add(tile);
+        long sender = client.getAccountHash();
+        outputQueue.add(TilemanPacket.createTileUpdatePacket(sender, state));
+        outputQueue.add(tile);
+        outputQueue.add(TilemanPacket.createEndOfDataPacket(sender));
     }
 
     public void disconnect() {
-        stayConnected = false;
+        isShuttingDown = true;
     }
-
-    private static void validateEndOfDataPacket(Object data) throws UnexpectedPacketTypeException {
-        if (data instanceof TilemanPacket) {
-            TilemanPacket packet = (TilemanPacket) data;
-            if (packet.packetType != PacketType.END_OF_DATA) {
-                throw new UnexpectedPacketTypeException("Expected an END_OF_DATA packet. Received " + packet.packetType + " packet.");
-            }
-            return;
-        }
-        throw new UnexpectedPacketTypeException("Expected an END_OF_DATA packet. Received object: " + data.getClass().getSimpleName());
-    }
-}
-
-enum ClientState {
-    CONNECTING,
-    SYNCING,
-    CONNECTED,
-    DISCONNECTED
 }

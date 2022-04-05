@@ -611,6 +611,7 @@ public class TilemanModePlugin extends Plugin {
         }
 
         savePoints(regionId, tilemanModeTiles);
+        TilemanMultiplayerService.sendMultiplayerTileUpdate(point, markedValue);
     }
 
     int getXpUntilNextTile() {

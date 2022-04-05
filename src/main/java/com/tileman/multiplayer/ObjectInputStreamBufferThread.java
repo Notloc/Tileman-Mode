@@ -44,9 +44,9 @@ public class ObjectInputStreamBufferThread extends Thread {
         return null;
     }
 
-    public Object waitForData(IShutdown target) throws ShutdownException, InterruptedException {
+    public Object waitForData(NetworkedThread thread) throws ShutdownException, InterruptedException {
         Object data = null;
-        while (!target.isShutdown()) {
+        while (!thread.isShutdown()) {
             data = getNextObject();
             if (data != null) {
                 break;
@@ -55,7 +55,7 @@ public class ObjectInputStreamBufferThread extends Thread {
             }
         }
 
-        if (target.isShutdown()) {
+        if (thread.isShutdown()) {
             throw new ShutdownException();
         }
 
@@ -63,7 +63,7 @@ public class ObjectInputStreamBufferThread extends Thread {
     }
 
     /**
-     * Stops the PacketReader
+     * Stops the BufferThread
      * Takes up to 0.5s if blocked by I/O
      */
     public void teardown() {

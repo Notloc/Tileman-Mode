@@ -1,51 +1,40 @@
 package com.tileman.multiplayer;
 
 import java.io.Serializable;
+import static com.tileman.multiplayer.TilemanPacketType.*;
 
 public class TilemanPacket implements Serializable {
     public static final long SERVER_ID = 0;
 
-    PacketType packetType;
-    long sender;
-    String message;
+    public final TilemanPacketType packetType;
+    public final long sender;
+    public String message;
 
-    private TilemanPacket() {}
+    private TilemanPacket(TilemanPacketType packetType, long sender) {
+        this.packetType = packetType;
+        this.sender = sender;
+    }
 
     public static TilemanPacket createRegionDataRequest(long sender, int regionId) {
-        TilemanPacket packet = new TilemanPacket();
-        packet.packetType = PacketType.REGION_DATA_REQUEST;
+        TilemanPacket packet = new TilemanPacket(REGION_DATA_REQUEST, sender);
         packet.message = String.valueOf(regionId);
-        packet.sender = sender;
         return packet;
     }
 
     public static TilemanPacket createRegionDataResponse(long sender, int regionId) {
-        TilemanPacket packet = new TilemanPacket();
-        packet.packetType = PacketType.REGION_DATA_RESPONSE;
+        TilemanPacket packet = new TilemanPacket(REGION_DATA_RESPONSE, sender);
         packet.message = String.valueOf(regionId);
-        packet.sender = sender;
         return packet;
     }
 
     public static TilemanPacket createTileUpdatePacket(long sender, boolean state) {
-        TilemanPacket packet = new TilemanPacket();
-        packet.packetType = PacketType.TILE_UPDATE;
+        TilemanPacket packet = new TilemanPacket(TILE_UPDATE, sender);
         packet.message = Boolean.toString(state);
-        packet.sender = sender;
         return packet;
     }
 
     public static TilemanPacket createEndOfDataPacket(long sender) {
-        TilemanPacket packet = new TilemanPacket();
-        packet.packetType = PacketType.END_OF_DATA;
-        packet.sender = sender;
+        TilemanPacket packet = new TilemanPacket(END_OF_DATA, sender);
         return packet;
     }
-}
-
-enum PacketType {
-    REGION_DATA_REQUEST,
-    REGION_DATA_RESPONSE,
-    TILE_UPDATE,
-    END_OF_DATA
 }
