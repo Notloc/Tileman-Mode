@@ -7,12 +7,13 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class ConcurrentOutputQueue<T> {
     private final Queue<T> outputQueue = new LinkedList<T>();
     private final ObjectOutputStream objectOutputStream;
 
-    private Lock l;
+    private final Lock l = new ReentrantLock();
 
     public ConcurrentOutputQueue(OutputStream outputStream) throws IOException {
         this.objectOutputStream = new ObjectOutputStream(outputStream);
@@ -20,16 +21,26 @@ public class ConcurrentOutputQueue<T> {
 
     public void queueData(T... data) {
         l.lock();
-        Collections.addAll(outputQueue, data);
-        l.unlock();
+        try {
+            Collections.addAll(outputQueue, data);
+        } finally {
+            l.unlock();
+        }
     }
 
     public void flush() throws IOException {
-        l.lock();
-        while (!outputQueue.isEmpty()) {
-            objectOutputStream.writeObject(outputQueue.remove());
+        if (outputQueue.isEmpty()) {
+            return;
         }
-        objectOutputStream.flush();
-        l.unlock();
+
+        l.lock();
+        try {
+            while (!outputQueue.isEmpty()) {
+                objectOutputStream.writeObject(outputQueue.remove());
+            }
+            objectOutputStream.flush();
+        } finally {
+            l.unlock();
+        }
     }
 }
