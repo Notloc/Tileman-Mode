@@ -102,13 +102,14 @@ public class TilemanServer extends NetworkedThread {
         ensurePlayerEntry(sender);
 
         if (state) {
-            playerTileData.get(sender).get(tile.getRegionId()).add(tile);
+            playerTileData.get(sender).add(tile.getRegionId(), tile);
         } else {
-            playerTileData.get(sender).get(tile.getRegionId()).remove(tile);
+            playerTileData.get(sender).remove(tile.getRegionId(), tile);
         }
         // Send the update to all connected players
-        TilemanPacket responsePacket = TilemanPacket.createTileUpdatePacket(TilemanPacket.SERVER_ID, state);
-        queueOutputForAllConnections(responsePacket, tile);
+        TilemanPacket updatePacket = TilemanPacket.createTileUpdatePacket(TilemanPacket.SERVER_ID, state);
+        TilemanPacket eod = TilemanPacket.createEndOfDataPacket(TilemanPacket.SERVER_ID);
+        queueOutputForAllConnections(updatePacket, tile, eod);
     }
 
     private void ensurePlayerEntry(long playerId) {
