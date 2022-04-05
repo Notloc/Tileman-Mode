@@ -66,6 +66,7 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
                 break;
             case TILE_UPDATE:
                 handleTileUpdate(packet, input);
+                break;
             case REGION_DATA_RESPONSE:
                 handleRegionDataResponse(packet, input);
                 break;
