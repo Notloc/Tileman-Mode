@@ -133,10 +133,11 @@ public class TilemanClient extends NetworkedThread {
         }
     }
 
-    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, ShutdownException {
+    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, ShutdownException, UnexpectedPacketTypeException {
         Object object = input.waitForData(this);
-
         TilemanModeTile tile = (TilemanModeTile)object;
+        validateEndOfDataPacket(input.waitForData(this));
+
         if (multiplayerTileData.containsKey(tile.getRegionId())) {
             boolean tileState = Boolean.parseBoolean(packet.message);
             if (tileState) {
