@@ -73,7 +73,7 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
     private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input, ObjectOutputStream output) throws IOException, ClassNotFoundException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
         switch (packet.packetType) {
             case REGION_DATA_REQUEST:
-                handleRegionDataRequest(packet, output);
+                handleRegionDataRequest(packet, output, input);
                 break;
             case TILE_UPDATE:
                 handleTileUpdate(packet, input);
@@ -86,9 +86,10 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
         output.flush();
     }
 
-    private void handleRegionDataRequest(TilemanPacket packet, ObjectOutputStream output) throws IOException {
-        int regionId = Integer.parseInt(packet.message);
+    private void handleRegionDataRequest(TilemanPacket packet, ObjectOutputStream output, ObjectInputStreamBufferThread input) throws IOException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
+        validateEndOfDataPacket(input.waitForData(this));
 
+        int regionId = Integer.parseInt(packet.message);
         Set<TilemanModeTile> tileSet = server.gatherTilesInRegionForUser(packet.sender, regionId);
         List<TilemanModeTile> tiles = new ArrayList<>();
         for (TilemanModeTile tile : tileSet) {
