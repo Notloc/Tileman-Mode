@@ -1,5 +1,9 @@
 package com.tileman.multiplayer;
 
+import lombok.extern.slf4j.Slf4j;
+import java.io.Closeable;
+import java.io.IOException;
+
 public abstract class NetworkedThread extends Thread implements IShutdown {
 
     protected boolean isShuttingDown = false;

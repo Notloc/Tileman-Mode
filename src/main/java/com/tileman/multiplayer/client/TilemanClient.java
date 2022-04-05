@@ -24,7 +24,7 @@ public class TilemanClient extends NetworkedThread {
 
     @Getter
     private final ConcurrentSetMap<Integer, TilemanModeTile> multiplayerTileData = new ConcurrentSetMap<>();
-    private final ConcurrentLinkedQueue<Object> outputQueue = new ConcurrentLinkedQueue<>();
+    private ConcurrentOutputQueue<Object> outputQueue;
     private TilemanClientState clientState;
 
     public TilemanClient(Client client, TilemanModePlugin plugin, String hostname, int portNumber) {
@@ -48,26 +48,25 @@ public class TilemanClient extends NetworkedThread {
         try {
             Socket socket = new Socket(hostname, portNumber);
 
-            ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
-
+            outputQueue = new ConcurrentOutputQueue<>(socket.getOutputStream());
             ObjectInputStreamBufferThread inputThread = new ObjectInputStreamBufferThread(socket.getInputStream());
             inputThread.start();
 
             clientState = TilemanClientState.SYNCING;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
 
-            uploadTileDataToServer(plugin.getTilesByRegion(), output);
+            uploadTileDataToServer(plugin.getTilesByRegion());
 
             clientState = TilemanClientState.CONNECTED;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
 
             requestRegionData(client.getMapRegions());
             while (!isShutdown()) {
-                handleOutputQueue(output);
+                outputQueue.flush();
 
                 TilemanPacket packet = inputThread.getNextPacket();
                 if (packet != null) {
-                    handlePacket(packet, inputThread, output);
+                    handlePacket(packet, inputThread);
                 }
 
                 sleep(50);
@@ -85,28 +84,19 @@ public class TilemanClient extends NetworkedThread {
         }
     }
 
-    private void uploadTileDataToServer(Map<Integer, List<TilemanModeTile>> tileData, ObjectOutputStream output) throws IOException {
+    private void uploadTileDataToServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
         long sender = client.getAccountHash();
          for (Integer regionId : tileData.keySet()) {
-             output.writeObject(TilemanPacket.createRegionDataResponse(sender, regionId));
-             output.writeObject(tileData.get(regionId));
-             output.writeObject(TilemanPacket.createEndOfDataPacket(sender));
-             output.flush();
+             outputQueue.queueData(
+                 TilemanPacket.createRegionDataResponse(sender, regionId),
+                 tileData.get(regionId),
+                 TilemanPacket.createEndOfDataPacket(sender)
+             );
          }
+        outputQueue.flush();
     }
 
-    private void handleOutputQueue(ObjectOutputStream output) throws IOException {
-        if (outputQueue.peek() == null) {
-            return;
-        }
-
-        while (outputQueue.peek() != null) {
-            output.writeObject(outputQueue.remove());
-        }
-        output.flush();
-    }
-
-    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input, ObjectOutputStream output) throws IOException, ClassNotFoundException, InterruptedException, ShutdownException, UnexpectedPacketTypeException {
+    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, InterruptedException, ShutdownException, UnexpectedPacketTypeException {
         switch (packet.packetType) {
             case REGION_DATA_RESPONSE:
                 handleIncomingRegionData(packet, input);
@@ -150,15 +140,20 @@ public class TilemanClient extends NetworkedThread {
 
     public void requestRegionData(int[] regionIds) {
         for (int regionId : regionIds) {
-            outputQueue.add(TilemanPacket.createRegionDataRequest(client.getAccountHash(), regionId));
+            outputQueue.queueData(
+                TilemanPacket.createRegionDataRequest(client.getAccountHash(), regionId),
+                TilemanPacket.createEndOfDataPacket(client.getAccountHash())
+            );
         }
     }
 
     public void sendTileUpdate(TilemanModeTile tile, boolean state) {
         long sender = client.getAccountHash();
-        outputQueue.add(TilemanPacket.createTileUpdatePacket(sender, state));
-        outputQueue.add(tile);
-        outputQueue.add(TilemanPacket.createEndOfDataPacket(sender));
+        outputQueue.queueData(
+            TilemanPacket.createTileUpdatePacket(sender, state),
+            tile,
+            TilemanPacket.createEndOfDataPacket(sender)
+        );
     }
 
     public void disconnect() {

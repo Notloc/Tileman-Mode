@@ -19,11 +19,12 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
     private TilemanServer server;
     Socket connection;
 
-    private ConcurrentLinkedQueue<Object> outputQueue = new ConcurrentLinkedQueue<>();
+    private ConcurrentOutputQueue<Object> outputQueue;
 
-    public TilemanServerConnectionHandler(TilemanServer server, Socket connection) {
+    public TilemanServerConnectionHandler(TilemanServer server, Socket connection) throws IOException {
         this.server = server;
         this.connection = connection;
+        this.outputQueue = new ConcurrentOutputQueue<>(connection.getOutputStream());
         server.addConnection(connection, outputQueue);
     }
 
@@ -33,16 +34,15 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
         ObjectInputStreamBufferThread inputThread = null;
 
         try {
-            ObjectOutputStream output = new ObjectOutputStream(connection.getOutputStream());
             inputThread = new ObjectInputStreamBufferThread(connection.getInputStream());
             inputThread.start();
 
             while (!connection.isClosed()) {
-                handleOutputQueue(output);
+                outputQueue.flush();
 
                 TilemanPacket packet = inputThread.getNextPacket();
                 if (packet != null) {
-                    handlePacket(packet, inputThread, output);
+                    handlePacket(packet, inputThread);
                 }
                 sleep(50);
             }
@@ -59,21 +59,10 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
         }
     }
 
-    private void handleOutputQueue(ObjectOutputStream output) throws IOException {
-        if (outputQueue.peek() == null) {
-            return;
-        }
-
-        while (outputQueue.peek() != null) {
-            output.writeObject(outputQueue.remove());
-        }
-        output.flush();
-    }
-
-    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input, ObjectOutputStream output) throws IOException, ClassNotFoundException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
+    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
         switch (packet.packetType) {
             case REGION_DATA_REQUEST:
-                handleRegionDataRequest(packet, output, input);
+                handleRegionDataRequest(packet, input);
                 break;
             case TILE_UPDATE:
                 handleTileUpdate(packet, input);
@@ -83,10 +72,9 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
             default:
                 throw new IOException("Unexpected packet type in server: " + packet.packetType);
         }
-        output.flush();
     }
 
-    private void handleRegionDataRequest(TilemanPacket packet, ObjectOutputStream output, ObjectInputStreamBufferThread input) throws IOException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
+    private void handleRegionDataRequest(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
         validateEndOfDataPacket(input.waitForData(this));
 
         int regionId = Integer.parseInt(packet.message);
@@ -96,9 +84,11 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
             tiles.add(tile);
         }
 
-        output.writeObject(TilemanPacket.createRegionDataResponse(TilemanPacket.SERVER_ID, regionId));
-        output.writeObject(tiles);
-        output.writeObject(TilemanPacket.createEndOfDataPacket(TilemanPacket.SERVER_ID));
+        outputQueue.queueData(
+            TilemanPacket.createRegionDataResponse(TilemanPacket.SERVER_ID, regionId),
+            tiles,
+            TilemanPacket.createEndOfDataPacket(TilemanPacket.SERVER_ID)
+        );
     }
 
     private void handleRegionDataResponse(TilemanPacket packet, ObjectInputStreamBufferThread input) throws ShutdownException, InterruptedException, UnexpectedPacketTypeException {

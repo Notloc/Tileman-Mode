@@ -22,7 +22,7 @@ public class TilemanServer extends NetworkedThread {
     // It's a thread safe map by userHash of each user's tile data. Tile data is mapped by region and stored in hashsets.
     ConcurrentHashMap<Long, ConcurrentSetMap<Integer, TilemanModeTile>> playerTileData = new ConcurrentHashMap<>();
 
-    ConcurrentHashMap<Socket, ConcurrentLinkedQueue<Object>> outputQueueBySocket = new ConcurrentHashMap<>();
+    ConcurrentHashMap<Socket, ConcurrentOutputQueue<Object>> outputQueueBySocket = new ConcurrentHashMap<>();
 
     private final Set<Socket> activeConnections = ConcurrentHashMap.newKeySet();
 
@@ -66,11 +66,13 @@ public class TilemanServer extends NetworkedThread {
     }
 
     private void startConnectionThread(Socket connection) {
-        TilemanServerConnectionHandler connectionHandler = new TilemanServerConnectionHandler(this, connection);
-        connectionHandler.start();
+        try {
+            TilemanServerConnectionHandler connectionHandler = new TilemanServerConnectionHandler(this, connection);
+            connectionHandler.start();
+        } catch (IOException e) {}
     }
 
-    void addConnection(Socket connection, ConcurrentLinkedQueue<Object> outputQueue) {
+    void addConnection(Socket connection, ConcurrentOutputQueue<Object> outputQueue) {
         activeConnections.add(connection);
         outputQueueBySocket.put(connection, outputQueue);
     }
@@ -118,18 +120,14 @@ public class TilemanServer extends NetworkedThread {
         }
     }
 
-    void queueOutputForAllConnections(TilemanPacket packet, Object... objects) {
+    void queueOutputForAllConnections(Object... objects) {
         for (Socket connection : activeConnections) {
-            queueOutputForConnection(connection, packet, objects);
+            queueOutputForConnection(connection, objects);
         }
     }
 
-    private void queueOutputForConnection(Socket connection, TilemanPacket packet, Object... data) {
-        Queue<Object> outputQueue = outputQueueBySocket.get(connection);
-        outputQueue.add(packet);
-
-        if (data != null) {
-            Collections.addAll(outputQueue, data);
-        }
+    private void queueOutputForConnection(Socket connection, Object... data) {
+        ConcurrentOutputQueue<Object> outputQueue = outputQueueBySocket.get(connection);
+        outputQueue.queueData(data);
     }
 }
