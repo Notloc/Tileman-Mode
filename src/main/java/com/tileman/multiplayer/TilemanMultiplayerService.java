@@ -8,6 +8,8 @@ import com.tileman.multiplayer.server.TilemanServer;
 import net.runelite.api.Client;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class TilemanMultiplayerService {
@@ -73,6 +75,12 @@ public class TilemanMultiplayerService {
 
     public static ConcurrentSetMap<Integer, TilemanModeTile> getMultiplayerTileData() {
         return serverClient.getMultiplayerTileData();
+    }
+
+    public static void requestRegionData(List<Integer> regions) {
+        if (isConnected()) {
+            serverClient.requestRegionData(regions);
+        }
     }
 
     public static void sendMultiplayerTileUpdate(TilemanModeTile tile, boolean state) {

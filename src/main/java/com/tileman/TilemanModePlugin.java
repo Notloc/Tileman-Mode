@@ -165,6 +165,7 @@ public class TilemanModePlugin extends Plugin {
             return;
         }
 
+        requestMultiplayerTiles();
         updateTileCounter();
         inHouse = false;
     }
@@ -649,5 +650,29 @@ public class TilemanModePlugin extends Plugin {
         }
     }
 
+    private int[] mapRegionsLastSeen = null;
+    private void requestMultiplayerTiles() {
+        if (mapRegionsLastSeen == null) {
+            mapRegionsLastSeen = client.getMapRegions();
+        }
 
+        int[] newMapRegions = client.getMapRegions();
+        List<Integer> requestRegions = new ArrayList<>();
+
+        for (int newRegion : newMapRegions) {
+            boolean contains = false;
+            for (int region : mapRegionsLastSeen) {
+                if (newRegion == region) {
+                    contains = true;
+                    break;
+                }
+            }
+            if (!contains) {
+                requestRegions.add(newRegion);
+            }
+        }
+
+        TilemanMultiplayerService.requestRegionData(requestRegions);
+        mapRegionsLastSeen = client.getMapRegions();
+    }
 }

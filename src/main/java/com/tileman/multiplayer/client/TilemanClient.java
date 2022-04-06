@@ -10,6 +10,8 @@ import net.runelite.api.Client;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -138,11 +140,20 @@ public class TilemanClient extends NetworkedThread {
         }
     }
 
-    public void requestRegionData(int[] regionIds) {
+    public void requestRegionData(Collection<Integer> regionIds) {
         for (int regionId : regionIds) {
             outputQueue.queueData(
                 TilemanPacket.createRegionDataRequest(client.getAccountHash(), regionId),
                 TilemanPacket.createEndOfDataPacket(client.getAccountHash())
+            );
+        }
+    }
+
+    public void requestRegionData(int[] regionIds) {
+        for (int regionId : regionIds) {
+            outputQueue.queueData(
+                    TilemanPacket.createRegionDataRequest(client.getAccountHash(), regionId),
+                    TilemanPacket.createEndOfDataPacket(client.getAccountHash())
             );
         }
     }

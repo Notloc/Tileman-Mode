@@ -37,10 +37,6 @@ public class Util {
         return str == null || str.isEmpty();
     }
 
-    public static <T> Set<T> set() {
-        return (Set<T>)new HashSet<T>();
-    }
-
     public static <T> Set<T> set(T... items) {
         Set<T> set = new HashSet<T>();
         for (T item : items) {
