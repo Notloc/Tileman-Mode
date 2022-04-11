@@ -34,9 +34,7 @@ import net.runelite.client.ui.overlay.*;
 
 import javax.inject.Inject;
 import java.awt.*;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 class TilemanModeMinimapOverlay extends Overlay
 {
@@ -47,8 +45,6 @@ class TilemanModeMinimapOverlay extends Overlay
 	private final Client client;
 	private final TilemanModeConfig config;
 	private final TilemanModePlugin plugin;
-
-	private List<WorldPoint> worldPointBuffer = new ArrayList<>(250);
 
 	@Inject
 	private TilemanModeMinimapOverlay(Client client, TilemanModeConfig config, TilemanModePlugin plugin)
@@ -70,23 +66,15 @@ class TilemanModeMinimapOverlay extends Overlay
 		}
 
 		Color color = getTileColor();
-		int[] loadedRegions = client.getMapRegions();
-		Map<Integer, List<TilemanModeTile>> tilesByRegion = plugin.getTilesByRegion();
+		List<WorldPoint> visibleTilePoints = plugin.getVisiblePoints();
 
-		for (Integer region : loadedRegions)
+		for (final WorldPoint point : visibleTilePoints)
 		{
-			List<TilemanModeTile> tiles = tilesByRegion.get(region);
-			worldPointBuffer.clear();
-			Util.translateTilesToWorldPoints(client, tiles, worldPointBuffer);
-
-			for (final WorldPoint point : worldPointBuffer)
+			if (point.getPlane() != client.getPlane())
 			{
-				if (point.getPlane() != client.getPlane())
-				{
-					continue;
-				}
-				drawOnMinimap(graphics, point, color);
+				continue;
 			}
+			drawOnMinimap(graphics, point, color);
 		}
 
 		return null;
