@@ -36,6 +36,7 @@ import net.runelite.api.*;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.*;
+import net.runelite.api.widgets.WidgetID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -61,6 +62,7 @@ public class TilemanModePlugin extends Plugin {
     private static final String MARK = "Unlock Tileman tile";
     private static final String UNMARK = "Clear Tileman tile";
     private static final String WALK_HERE = "Walk here";
+    private static final String UNLOCK_BANK_SLOT = "Unlock Bank Slot";
 
     private final Set<Integer> tutorialIslandRegionIds = Util.set(12079, 12080, 12335, 12336, 12592);
 
@@ -72,6 +74,7 @@ public class TilemanModePlugin extends Plugin {
     @Inject private TilemanModeMinimapOverlay minimapOverlay;
     @Inject private TilemanModeWorldMapOverlay worldMapOverlay;
     @Inject private TileInfoOverlay infoOverlay;
+    @Inject private TilemanBankInfoOverlay bankOverlay;
     @Inject private ClientToolbar clientToolbar;
 
     @Provides
@@ -128,8 +131,17 @@ public class TilemanModePlugin extends Plugin {
 
     @Subscribe
     public void onMenuOptionClicked(MenuOptionClicked event) {
-        if (event.getMenuAction().getId() != MenuAction.RUNELITE.getId() ||
-                !(event.getMenuOption().equals(MARK) || event.getMenuOption().equals(UNMARK))) {
+        if (event.getMenuAction().getId() != MenuAction.RUNELITE.getId()) {
+            return;
+        }
+
+        tryClickTileMarkOption(event);
+        tryClickUnlockBankSlotOption(event);
+
+    }
+
+    private void tryClickTileMarkOption(MenuOptionClicked event) {
+        if (!(event.getMenuOption().equals(MARK) || event.getMenuOption().equals(UNMARK))) {
             return;
         }
 
@@ -140,10 +152,27 @@ public class TilemanModePlugin extends Plugin {
         handleMenuOption(target.getLocalLocation(), event.getMenuOption().equals(MARK));
     }
 
+    private void tryClickUnlockBankSlotOption(MenuOptionClicked event) {
+        if (!event.getMenuOption().equals(UNLOCK_BANK_SLOT)) {
+            return;
+        }
+
+        profileManager.unlockBankSlot();
+    }
+
     @Subscribe
     public void onMenuEntryAdded(MenuEntryAdded event) {
+        if (!profileManager.hasActiveProfile()) {
+            return;
+        }
+
+        tryAddTileMarkOption(event);
+        tryAddUnlockBankSlotOption(event);
+    }
+
+    private void tryAddTileMarkOption(MenuEntryAdded event) {
         final boolean hotKeyPressed = client.isKeyPressed(KeyCode.KC_SHIFT);
-        if (hotKeyPressed && profileManager.hasActiveProfile() && event.getOption().equals(WALK_HERE)) {
+        if (hotKeyPressed && event.getOption().equals(WALK_HERE)) {
             final Tile selectedSceneTile = client.getSelectedSceneTile();
 
             if (selectedSceneTile == null) {
@@ -157,6 +186,16 @@ public class TilemanModePlugin extends Plugin {
             client.createMenuEntry(-1)
                     .setOption(profileManager.getTilesByRegion().getOrDefault(regionId, new ArrayList()).contains(point) ? UNMARK : MARK)
                     .setTarget(event.getTarget())
+                    .setType(MenuAction.RUNELITE);
+        }
+    }
+
+    private void tryAddUnlockBankSlotOption(MenuEntryAdded event) {
+        boolean isBankWindow = (event.getActionParam1() >> 16) == WidgetID.BANK_GROUP_ID;
+        if (isBankWindow && event.getOption().equals("Show menu")) {
+            client.createMenuEntry(-1)
+                    .setOption(UNLOCK_BANK_SLOT)
+                    .setTarget("")
                     .setType(MenuAction.RUNELITE);
         }
     }
@@ -231,6 +270,7 @@ public class TilemanModePlugin extends Plugin {
         overlayManager.add(minimapOverlay);
         overlayManager.add(worldMapOverlay);
         overlayManager.add(infoOverlay);
+        overlayManager.add(bankOverlay);
 
         updateTileInfoDisplay();
         log.debug("startup");
@@ -339,7 +379,7 @@ public class TilemanModePlugin extends Plugin {
             earnedTiles += client.getTotalLevel();
         }
 
-        remainingTiles = earnedTiles - placedTiles;
+        remainingTiles = earnedTiles - placedTiles - profileManager.getTilesSpentOnBankSlots();
     }
 
     private void updateXpUntilNextTile() {

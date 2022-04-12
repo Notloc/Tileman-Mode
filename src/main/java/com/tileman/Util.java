@@ -4,8 +4,11 @@ import com.google.common.base.Strings;
 import com.google.gson.reflect.TypeToken;
 import net.runelite.api.Client;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.client.ui.overlay.components.PanelComponent;
 
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 
 public class Util {
 
@@ -43,5 +46,29 @@ public class Util {
             set.add(item);
         }
         return set;
+    }
+
+    public static int getLongestStringWidth(Graphics2D graphics, String... strings) {
+        int longest = graphics.getFontMetrics().stringWidth("000000");
+        for(String i: strings) {
+            int currentItemWidth = graphics.getFontMetrics().stringWidth(i);
+            if(currentItemWidth > longest) {
+                longest = currentItemWidth;
+            }
+        }
+        return longest;
+    }
+
+    public static String addCommasToNumber(int number) {
+        String input = Integer.toString(number);
+        StringBuilder output = new StringBuilder();
+        for(int x = input.length() - 1; x >= 0; x--) {
+            int lastPosition = input.length() - x - 1;
+            if(lastPosition != 0 && lastPosition % 3 == 0) {
+                output.append(",");
+            }
+            output.append(input.charAt(x));
+        }
+        return output.reverse().toString();
     }
 }

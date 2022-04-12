@@ -64,4 +64,6 @@ public class TilemanProfile implements Serializable {
     public String getRegionPrefix() {
         return accountHash + "_region_";
     }
+
+    public String getTilesSpentOnBankSlotsKey() { return accountHash + "_bankSlotTiles"; }
 }

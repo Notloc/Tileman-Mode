@@ -48,11 +48,14 @@ public class TilemanProfileManager {
     private static final String LEGACY_REGION_PREFIX = "region_";
     private static final Gson GSON = new Gson();
 
+    private TilemanModePlugin plugin;
     private ConfigManager configManager;
     private Client client;
 
     private TilemanGameRules gameRules = TilemanGameRules.GetDefaultRules();
     private TilemanProfile activeProfile = TilemanProfile.NONE;
+    private CustomizableFormula bankSlotFormula = new CustomizableFormula(CustomizableFormula.FormulaType.EXPONENTIAL, 2);
+    private int tilesSpentOnBankSlots = 0;
 
     @Getter(AccessLevel.PACKAGE)
     private Map<Integer, List<TilemanModeTile>> tilesByRegion = new HashMap<>();
@@ -62,6 +65,7 @@ public class TilemanProfileManager {
     public  TilemanProfileManager(TilemanModePlugin plugin, Client client, ConfigManager configManager) {
         this.client = client;
         this.configManager = configManager;
+        this.plugin = plugin;
         plugin.onLoginStateChangedEvent.add(state -> onLoginStateChanged(state));
     }
 
@@ -82,6 +86,8 @@ public class TilemanProfileManager {
     void setActiveProfile(TilemanProfile profile) {
         this.activeProfile = profile;
         this.gameRules = loadGameRules(profile);
+        this.bankSlotFormula = new CustomizableFormula(CustomizableFormula.FormulaType.EXPONENTIAL, gameRules.getBankSlotScalingFactor());
+        this.tilesSpentOnBankSlots = loadTilesSpentOnBankSlots(profile);
 
         tilesByRegion.clear();
         tilesByRegion = loadAllTiles(profile, configManager);
@@ -177,7 +183,9 @@ public class TilemanProfileManager {
 
     private TilemanGameRules loadGameRules(TilemanProfile profile) {
         String rulesKey = profile.getGameRulesKey();
-        return getJsonFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, rulesKey, TilemanGameRules.class, TilemanGameRules.GetDefaultRules());
+        TilemanGameRules rules = getJsonFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, rulesKey, TilemanGameRules.class, TilemanGameRules.GetDefaultRules());
+        rules.validate();
+        return rules;
     }
 
     private void saveGameRules(TilemanProfile profile, TilemanGameRules rules) {
@@ -229,6 +237,62 @@ public class TilemanProfileManager {
         gameRules.setExpPerTile(exp);
         saveGameRules(activeProfile, gameRules);
     }
+
+    public boolean isTilesUnlockBankSlots() { return gameRules.isTilesUnlockBankSlots(); }
+    public void setTilesUnlockBankSlots(boolean state) {
+        gameRules.setTilesUnlockBankSlots(state);
+        saveGameRules(activeProfile, gameRules);
+    }
+
+    public int getBankSlotScalingFactor() { return gameRules.getBankSlotScalingFactor(); }
+    public void setBankSlotScalingFactor(int scalingFactor) {
+        gameRules.setBankSlotScalingFactor(scalingFactor);
+        bankSlotFormula.b = scalingFactor;
+        saveGameRules(activeProfile, gameRules);
+    }
+
+    public int getUnlockedBankSlots() {
+        return bankSlotFormula.solveForX(tilesSpentOnBankSlots);
+    }
+
+    public int getTilesForNextBankSlot() {
+        int unlockedSlots = getUnlockedBankSlots();
+        return bankSlotFormula.solveForY(unlockedSlots + 1) - tilesSpentOnBankSlots;
+    }
+
+
+    public boolean unlockBankSlot() {
+        int cost = getTilesForNextBankSlot();
+        int availableTiles = plugin.getRemainingTiles();
+        if (availableTiles <= cost) {
+            return false;
+        }
+
+        tilesSpentOnBankSlots += cost;
+        saveTilesSpentOnBankSlots(activeProfile, tilesSpentOnBankSlots);
+        return true;
+    }
+
+    public int getTilesSpentOnBankSlots() {
+        return tilesSpentOnBankSlots;
+    }
+
+    public void resetTilesSpentOnBankSlots() {
+        tilesSpentOnBankSlots = 0;
+        saveTilesSpentOnBankSlots(activeProfile, tilesSpentOnBankSlots);
+    }
+
+    private void saveTilesSpentOnBankSlots(TilemanProfile profile, int tilesSpentOnSlots) {
+        if (profile == TilemanProfile.NONE) {
+            return;
+        }
+        configManager.setConfiguration(TilemanModeConfig.CONFIG_GROUP, profile.getTilesSpentOnBankSlotsKey(), tilesSpentOnSlots);
+    }
+
+    private int loadTilesSpentOnBankSlots(TilemanProfile profile) {
+        return getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, profile.getTilesSpentOnBankSlotsKey(), int.class, 0);
+    }
+
 
 
     private void saveAllTiles(TilemanProfile profile, Map<Integer, List<TilemanModeTile>> tileData) {
@@ -292,15 +356,14 @@ public class TilemanProfileManager {
     // LEGACY STUFF
 
     private TilemanGameRules loadGameRulesFromLegacySaveDataOrUseDefaults() {
-        TilemanGameRules defaults = TilemanGameRules.GetDefaultRules();
-        TilemanGameRules rules = new TilemanGameRules();
-        rules.setGameMode(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "gameMode", TilemanGameMode.class, defaults.getGameMode()));
-        rules.setAllowTileDeficit(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "allowTileDeficit", boolean.class, defaults.isAllowTileDeficit()));
-        rules.setEnableCustomGameMode(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "enableCustomGameMode", boolean.class, defaults.isEnableCustomGameMode()));
-        rules.setTilesOffset(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "tilesOffset", int.class, defaults.getTilesOffset()));
-        rules.setTilesFromTotalLevel(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "includeTotalLevels", boolean.class, defaults.isTilesFromTotalLevel()));
-        rules.setTilesFromExp(!getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "excludeExp", boolean.class, !defaults.isTilesFromExp())); // Negations are intentional due to the option being renamed to the opposite meaning
-        rules.setExpPerTile(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "expPerTile", int.class, defaults.getExpPerTile()));
+        TilemanGameRules rules = TilemanGameRules.GetDefaultRules();
+        rules.setGameMode(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "gameMode", TilemanGameMode.class, rules.getGameMode()));
+        rules.setAllowTileDeficit(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "allowTileDeficit", boolean.class, rules.isAllowTileDeficit()));
+        rules.setEnableCustomGameMode(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "enableCustomGameMode", boolean.class, rules.isEnableCustomGameMode()));
+        rules.setTilesOffset(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "tilesOffset", int.class, rules.getTilesOffset()));
+        rules.setTilesFromTotalLevel(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "includeTotalLevels", boolean.class, rules.isTilesFromTotalLevel()));
+        rules.setTilesFromExp(!getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "excludeExp", boolean.class, !rules.isTilesFromExp())); // Negations are intentional due to the option being renamed to the opposite meaning
+        rules.setExpPerTile(getFromConfigOrDefault(TilemanModeConfig.CONFIG_GROUP, "expPerTile", int.class, rules.getExpPerTile()));
         return rules;
     }
 

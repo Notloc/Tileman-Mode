@@ -260,6 +260,28 @@ public class TilemanPluginPanel extends PluginPanel {
 
                         rulesPanel.add(xpPanel);
                     }
+
+                    {
+                        JCheckBox tilesUnlockBankSlots = new JCheckBox("Tiles for Bank Slots");
+                        tilesUnlockBankSlots.setAlignmentX(CENTER_ALIGNMENT);
+                        tilesUnlockBankSlots.setSelected(profileManager.isTilesUnlockBankSlots());
+                        tilesUnlockBankSlots.addActionListener(l -> profileManager.setTilesUnlockBankSlots(tilesUnlockBankSlots.isSelected()));
+                        rulesPanel.add(tilesUnlockBankSlots);
+                    }
+
+                    {
+                        JPanel slotCostPanel = new JPanel();
+                        addFlowLayout(slotCostPanel);
+
+                        JLabel slotCostLabel = new JLabel("Bank Slot Scaling Factor");
+                        slotCostPanel.add(slotCostLabel);
+
+                        SpinnerNumberModel numberModel = new SpinnerNumberModel(profileManager.getBankSlotScalingFactor(), 1, 25, 1);
+                        JSpinner slotCostSpinner = new JSpinner(numberModel);
+                        slotCostSpinner.addChangeListener(l -> profileManager.setBankSlotScalingFactor(numberModel.getNumber().intValue()));
+                        slotCostPanel.add(slotCostSpinner);
+                        rulesPanel.add(slotCostPanel);
+                    }
                 }
             }
 
@@ -317,6 +339,7 @@ public class TilemanPluginPanel extends PluginPanel {
         JCollapsePanel advancedOptions = new JCollapsePanel("Advanced Options", advancedOpen, (Boolean isOpen) -> this.advancedOpen = isOpen);
         advancedOptions.setBorder(BorderFactory.createLineBorder(Color.black));
         addVerticalLayout(advancedOptions.getContentPanel());
+
         {
             JButton exportProfileButton = new JButton("Export Profile");
             exportProfileButton.setAlignmentX(CENTER_ALIGNMENT);
@@ -336,7 +359,26 @@ public class TilemanPluginPanel extends PluginPanel {
                     rebuild();
                 }
             });
+        }
 
+        {
+            JButton resetTilesSpentOnBankSlotsButton = new JButton("Reset Bank Slots");
+            resetTilesSpentOnBankSlotsButton.setAlignmentX(CENTER_ALIGNMENT);
+            resetTilesSpentOnBankSlotsButton.setEnabled(profileManager.hasActiveProfile());
+            advancedOptions.add(resetTilesSpentOnBankSlotsButton);
+
+            resetTilesSpentOnBankSlotsButton.addActionListener(l -> {
+                if (profileManager.hasActiveProfile()) {
+                    int choice = JOptionPane.showConfirmDialog(null, "Do you really want to reset your bank slots?", "Are you sure?", JOptionPane.YES_NO_OPTION);
+                    if (choice == 0) {
+                        profileManager.resetTilesSpentOnBankSlots();
+                        rebuild();
+                    }
+                }
+            });
+        }
+
+        {
             JButton deleteProfileButton = new JButton("Delete Profile");
             deleteProfileButton.setAlignmentX(CENTER_ALIGNMENT);
             deleteProfileButton.setEnabled(profileManager.hasActiveProfile());
@@ -355,6 +397,7 @@ public class TilemanPluginPanel extends PluginPanel {
                 }
             });
         }
+
         return advancedOptions;
     }
 

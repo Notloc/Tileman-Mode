@@ -15,29 +15,25 @@ public class TilemanGameRules implements Serializable {
     @Setter private int expPerTile;
     @Setter private boolean tilesFromTotalLevel;
     @Setter private int tilesOffset;
+    @Setter private boolean tilesUnlockBankSlots;
+    @Setter private int bankSlotScalingFactor;
 
     public TilemanGameRules() {}
 
-    public TilemanGameRules(TilemanGameMode gameMode, boolean enableCustomGameMode, boolean allowTileDeficit, boolean tilesFromTotalLevel, boolean tilesFromExp, int tilesOffset, int expPerTile) {
-        this.gameMode = gameMode;
-        this.enableCustomGameMode = enableCustomGameMode;
-        this.allowTileDeficit = allowTileDeficit;
-        this.tilesFromTotalLevel = tilesFromTotalLevel;
-        this.tilesFromExp = tilesFromExp;
-        this.tilesOffset = tilesOffset;
-        this.expPerTile = expPerTile;
-    }
-
     public static TilemanGameRules GetDefaultRules() {
-        return new TilemanGameRules(
-                TilemanGameMode.COMMUNITY,
-                false,
-                false,
-                false,
-                true,
-                9,
-                1000
-        );
+        TilemanGameRules rules = new TilemanGameRules();
+
+        rules.gameMode = TilemanGameMode.COMMUNITY;
+        rules.enableCustomGameMode = false;
+        rules.allowTileDeficit = false;
+        rules.tilesFromTotalLevel = false;
+        rules.tilesFromExp = true;
+        rules.tilesOffset = 9;
+        rules.expPerTile = 1000;
+        rules.tilesUnlockBankSlots = false;
+        rules.bankSlotScalingFactor = 5;
+
+        return rules;
     }
 
     public boolean isTilesFromTotalLevel() {
@@ -60,6 +56,10 @@ public class TilemanGameRules implements Serializable {
         return enableCustomGameMode ? expPerTile : 1000;
     }
 
+    public boolean isTilesUnlockBankSlots() { return enableCustomGameMode ? tilesUnlockBankSlots : false; }
+
+    public int getBankSlotScalingFactor() { return bankSlotScalingFactor; }
+
     private boolean getTilesFromTotalLevelByGameMode() {
         switch (gameMode) {
             case ACCELERATED:
@@ -75,6 +75,12 @@ public class TilemanGameRules implements Serializable {
                 return 9;
             default:
                 return 0;
+        }
+    }
+
+    public void validate() {
+        if (bankSlotScalingFactor == 0) {
+            bankSlotScalingFactor = 5;
         }
     }
 }

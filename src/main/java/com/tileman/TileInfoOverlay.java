@@ -69,9 +69,9 @@ class TileInfoOverlay extends OverlayPanel {
             return super.render(graphics);
         }
 
-        String unspentTiles = addCommasToNumber(plugin.getRemainingTiles());
-        String unlockedTiles = addCommasToNumber(plugin.getTotalTiles());
-        String xpUntilNextTile = addCommasToNumber(plugin.getXpUntilNextTile());
+        String unspentTiles = Util.addCommasToNumber(plugin.getRemainingTiles());
+        String unlockedTiles = Util.addCommasToNumber(plugin.getTotalTiles());
+        String xpUntilNextTile = Util.addCommasToNumber(plugin.getXpUntilNextTile());
 
         panelComponent.getChildren().add(LineComponent.builder()
                 .left(UNSPENT_TILES_STRING)
@@ -94,8 +94,8 @@ class TileInfoOverlay extends OverlayPanel {
                 .build());
 
         panelComponent.setPreferredSize(new Dimension(
-                getLongestStringWidth(STRINGS, graphics)
-                        + getLongestStringWidth(new String[] {unlockedTiles, unspentTiles}, graphics),
+                Util.getLongestStringWidth(graphics, STRINGS)
+                        + Util.getLongestStringWidth(graphics, unlockedTiles, unspentTiles),
                 0));
 
         return super.render(graphics);
@@ -110,29 +110,5 @@ class TileInfoOverlay extends OverlayPanel {
             }
         }
         return Color.WHITE;
-    }
-
-    private int getLongestStringWidth(String[] strings, Graphics2D graphics) {
-        int longest = graphics.getFontMetrics().stringWidth("000000");
-        for(String i: strings) {
-            int currentItemWidth = graphics.getFontMetrics().stringWidth(i);
-            if(currentItemWidth > longest) {
-                longest = currentItemWidth;
-            }
-        }
-        return longest;
-    }
-
-    private String addCommasToNumber(int number) {
-        String input = Integer.toString(number);
-        StringBuilder output = new StringBuilder();
-        for(int x = input.length() - 1; x >= 0; x--) {
-            int lastPosition = input.length() - x - 1;
-            if(lastPosition != 0 && lastPosition % 3 == 0) {
-                output.append(",");
-            }
-            output.append(input.charAt(x));
-        }
-        return output.reverse().toString();
     }
 }
