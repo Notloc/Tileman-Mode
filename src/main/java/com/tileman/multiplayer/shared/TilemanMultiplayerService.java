@@ -1,14 +1,13 @@
-package com.tileman.multiplayer;
+package com.tileman.multiplayer.shared;
 
 import com.tileman.TilemanModePlugin;
-import com.tileman.TilemanModeTile;
+import com.tileman.shared.TilemanModeTile;
 import com.tileman.multiplayer.client.TilemanClient;
 import com.tileman.multiplayer.client.TilemanClientState;
 import com.tileman.multiplayer.server.TilemanServer;
 import net.runelite.api.Client;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 

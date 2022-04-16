@@ -1,4 +1,4 @@
-package com.tileman.multiplayer;
+package com.tileman.multiplayer.shared;
 
 import java.util.Collection;
 import java.util.HashSet;

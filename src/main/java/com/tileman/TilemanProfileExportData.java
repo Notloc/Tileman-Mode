@@ -24,6 +24,9 @@
  */
 package com.tileman;
 
+import com.tileman.shared.TilemanModeTile;
+import com.tileman.shared.TilemanProfile;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;

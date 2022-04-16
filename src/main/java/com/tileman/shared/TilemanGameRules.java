@@ -1,4 +1,4 @@
-package com.tileman;
+package com.tileman.shared;
 
 import lombok.Getter;
 import lombok.Setter;

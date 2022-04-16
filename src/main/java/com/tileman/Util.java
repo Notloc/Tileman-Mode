@@ -1,7 +1,6 @@
 package com.tileman;
 
-import com.google.common.base.Strings;
-import com.google.gson.reflect.TypeToken;
+import com.tileman.shared.TilemanModeTile;
 import net.runelite.api.Client;
 import net.runelite.api.coords.WorldPoint;
 

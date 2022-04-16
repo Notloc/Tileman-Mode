@@ -31,6 +31,7 @@ import java.awt.*;
 import java.util.List;
 import javax.inject.Inject;
 
+import com.tileman.shared.TilemanModeTile;
 import net.runelite.api.Client;
 import net.runelite.api.Point;
 import net.runelite.api.RenderOverview;

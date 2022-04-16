@@ -26,8 +26,9 @@
  */
 package com.tileman;
 
-import com.tileman.multiplayer.ConcurrentSetMap;
-import com.tileman.multiplayer.TilemanMultiplayerService;
+import com.tileman.multiplayer.shared.ConcurrentSetMap;
+import com.tileman.multiplayer.shared.TilemanMultiplayerService;
+import com.tileman.shared.TilemanModeTile;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
 import net.runelite.api.coords.LocalPoint;

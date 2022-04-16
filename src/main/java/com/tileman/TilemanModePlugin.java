@@ -28,7 +28,8 @@
 package com.tileman;
 
 import com.google.inject.Provides;
-import com.tileman.multiplayer.TilemanMultiplayerService;
+import com.tileman.multiplayer.shared.TilemanMultiplayerService;
+import com.tileman.shared.TilemanModeTile;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;

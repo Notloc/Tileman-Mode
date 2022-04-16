@@ -1,7 +1,7 @@
-package com.tileman.multiplayer;
+package com.tileman.multiplayer.shared;
 
 import java.io.Serializable;
-import static com.tileman.multiplayer.TilemanPacketType.*;
+import static com.tileman.multiplayer.shared.TilemanPacketType.*;
 
 public class TilemanPacket implements Serializable {
     public static final long SERVER_ID = 0;

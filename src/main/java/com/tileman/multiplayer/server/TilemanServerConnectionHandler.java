@@ -1,18 +1,13 @@
 package com.tileman.multiplayer.server;
 
-import com.tileman.TilemanModeTile;
-import com.tileman.multiplayer.*;
+import com.tileman.shared.TilemanModeTile;
+import com.tileman.multiplayer.shared.*;
 
-import java.io.EOFException;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class TilemanServerConnectionHandler extends NetworkedThread {
 

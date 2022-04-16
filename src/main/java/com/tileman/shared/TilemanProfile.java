@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.tileman;
+package com.tileman.shared;
 
 import lombok.Getter;
 
@@ -64,4 +64,6 @@ public class TilemanProfile implements Serializable {
     public String getRegionPrefix() {
         return accountHash + "_region_";
     }
+
+    public String getGroupKey() { return accountHash + "_group"; }
 }

@@ -1,4 +1,4 @@
-package com.tileman.multiplayer;
+package com.tileman.multiplayer.shared;
 
 import java.io.IOException;
 import java.io.ObjectOutputStream;

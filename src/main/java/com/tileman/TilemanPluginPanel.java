@@ -1,6 +1,8 @@
 package com.tileman;
 
-import com.tileman.multiplayer.TilemanMultiplayerService;
+import com.tileman.multiplayer.shared.TilemanMultiplayerService;
+import com.tileman.shared.TilemanGameMode;
+import com.tileman.shared.TilemanProfile;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;

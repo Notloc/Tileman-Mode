@@ -1,16 +1,14 @@
 package com.tileman.multiplayer.server;
 
-import com.tileman.TilemanModeTile;
-import com.tileman.multiplayer.*;
+import com.tileman.shared.TilemanModeTile;
+import com.tileman.multiplayer.shared.*;
 import lombok.Getter;
-import net.runelite.api.Tile;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class TilemanServer extends NetworkedThread {
 

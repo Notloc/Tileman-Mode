@@ -1,4 +1,4 @@
-package com.tileman.multiplayer;
+package com.tileman.multiplayer.shared;
 
 import java.io.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
