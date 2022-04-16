@@ -32,8 +32,8 @@ public class TilemanProfile implements Serializable {
 
     public static final TilemanProfile NONE = new TilemanProfile(-1, "None");
 
-    @Getter private String accountHash;
-    @Getter private String profileName;
+    @Getter private final String accountHash;
+    @Getter private final String profileName;
 
     public TilemanProfile(long accountHash, String profileName) {
         this.accountHash = String.valueOf(accountHash);
@@ -65,5 +65,21 @@ public class TilemanProfile implements Serializable {
         return accountHash + "_region_";
     }
 
-    public String getGroupKey() { return accountHash + "_group"; }
+    public String getGroupKey() {
+        return accountHash + "_group";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof TilemanProfile)) {
+            return false;
+        }
+        TilemanProfile other = (TilemanProfile)o;
+        return accountHash.equals(other.getAccountHash());
+    }
+
+    @Override
+    public int hashCode() {
+        return accountHash.hashCode();
+    }
 }
