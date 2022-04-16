@@ -3,6 +3,7 @@ package com.tileman;
 import com.tileman.multiplayer.shared.TilemanMultiplayerService;
 import com.tileman.shared.TilemanGameMode;
 import com.tileman.shared.TilemanProfile;
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;
@@ -169,7 +170,7 @@ public class TilemanPluginPanel extends PluginPanel {
                 {
                     JLabel gameModeSelectLabel = new JLabel("Game Mode");
 
-                    JComboBox gameModeSelect = new JComboBox(TilemanGameMode.values());
+                    JComboBox<TilemanGameMode> gameModeSelect = new JComboBox<>(TilemanGameMode.values());
                     gameModeSelect.setSelectedItem(profileManager.getGameMode());
                     gameModeSelect.addActionListener(l -> profileManager.setGameMode((TilemanGameMode) gameModeSelect.getSelectedItem()));
 
@@ -267,7 +268,7 @@ public class TilemanPluginPanel extends PluginPanel {
 
         }
 
-        callbacks.forEach(func -> func.run());
+        callbacks.forEach(Runnable::run);
         return gameRulesPanel;
     }
 
@@ -300,11 +301,11 @@ public class TilemanPluginPanel extends PluginPanel {
                 multiplayerPanel.add(ipInput);
 
                 JButton connectButton = new JButton("Connect");
-                connectButton.addActionListener(e -> TilemanMultiplayerService.connect(plugin.getClient(), plugin, ipInput.getText(), PORT));
+                connectButton.addActionListener(e -> TilemanMultiplayerService.connect(plugin.getClient(), plugin, profileManager, ipInput.getText(), PORT, "password"));
                 multiplayerPanel.add(connectButton);
 
                 JButton startServerButton = new JButton("Launch Server");
-                startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(plugin.getClient(), plugin, PORT));
+                startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(plugin.getClient(), plugin, profileManager, PORT, "password"));
                 multiplayerPanel.add(startServerButton);
             }
         }
@@ -428,13 +429,13 @@ public class TilemanPluginPanel extends PluginPanel {
         clipboard.setContents(new StringSelection(text), null);
     }
 
-    public class JCollapsePanel extends JPanel {
+    public static class JCollapsePanel extends JPanel {
 
         private String title;
         private boolean isOpen;
 
-        private JPanel contentPanel;
-        private JButton toggleCollapseButton;
+        private final JPanel contentPanel;
+        private final JButton toggleCollapseButton;
 
         private Consumer<Boolean> onToggle;
 
@@ -467,7 +468,7 @@ public class TilemanPluginPanel extends PluginPanel {
         }
 
         @Override
-        public void add(Component component, Object constraints) {
+        public void add(@NonNull Component component, Object constraints) {
             contentPanel.add(component, constraints);
         }
 
