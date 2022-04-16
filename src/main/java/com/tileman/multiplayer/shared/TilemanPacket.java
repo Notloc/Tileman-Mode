@@ -1,40 +1,43 @@
 package com.tileman.multiplayer.shared;
 
+import com.sun.org.apache.xpath.internal.operations.Bool;
+import com.tileman.shared.TilemanProfile;
+
 import java.io.Serializable;
 import static com.tileman.multiplayer.shared.TilemanPacketType.*;
 
 public class TilemanPacket implements Serializable {
-    public static final long SERVER_ID = -1;
-
     public final TilemanPacketType packetType;
-    public final long sender;
-    public String message;
+    public final String sender;
+    public final String message;
 
-    private TilemanPacket(TilemanPacketType packetType, long sender) {
+    private TilemanPacket(TilemanPacketType packetType, TilemanProfile profile, String message) {
         this.packetType = packetType;
-        this.sender = sender;
+        this.sender = profile.getAccountHash();
+        this.message = message;
     }
 
-    public static TilemanPacket createRegionDataRequest(long sender, int regionId) {
-        TilemanPacket packet = new TilemanPacket(REGION_DATA_REQUEST, sender);
-        packet.message = String.valueOf(regionId);
-        return packet;
+    public static TilemanPacket createValidationPacket(TilemanProfile profile, String hashedPassword) {
+        return new TilemanPacket(VALIDATION, profile, hashedPassword);
     }
 
-    public static TilemanPacket createRegionDataResponse(long sender, int regionId) {
-        TilemanPacket packet = new TilemanPacket(REGION_DATA_RESPONSE, sender);
-        packet.message = String.valueOf(regionId);
-        return packet;
+    public static TilemanPacket createValidationResponsePacket(TilemanProfile profile, boolean isValidated) {
+        return new TilemanPacket(VALIDATION_RESPONSE, profile, Boolean.toString(isValidated));
     }
 
-    public static TilemanPacket createTileUpdatePacket(long sender, boolean state) {
-        TilemanPacket packet = new TilemanPacket(TILE_UPDATE, sender);
-        packet.message = Boolean.toString(state);
-        return packet;
+    public static TilemanPacket createRegionDataRequest(TilemanProfile profile, int regionId) {
+        return new TilemanPacket(REGION_DATA_REQUEST, profile, String.valueOf(regionId));
     }
 
-    public static TilemanPacket createEndOfDataPacket(long sender) {
-        TilemanPacket packet = new TilemanPacket(END_OF_DATA, sender);
-        return packet;
+    public static TilemanPacket createRegionDataResponse(TilemanProfile profile, int regionId) {
+        return new TilemanPacket(REGION_DATA_RESPONSE, profile, String.valueOf(regionId));
+    }
+
+    public static TilemanPacket createTileUpdatePacket(TilemanProfile profile, boolean state) {
+        return new TilemanPacket(TILE_UPDATE, profile, Boolean.toString(state));
+    }
+
+    public static TilemanPacket createEndOfDataPacket(TilemanProfile profile) {
+        return new TilemanPacket(END_OF_DATA, profile, "");
     }
 }

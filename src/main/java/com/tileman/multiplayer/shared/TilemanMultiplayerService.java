@@ -36,14 +36,14 @@ public class TilemanMultiplayerService {
         return server != null ? server.getPortNumber() : -1;
     }
 
-    public static void startServer(Client client, TilemanModePlugin plugin, int port) {
+    public static void startServer(Client client, TilemanModePlugin plugin, int port, String password) {
         if (server != null && server.isAlive()) {
             return;
         }
         server = new TilemanServer(port);
         server.start();
 
-        connect(client, plugin, "localhost", port);
+        connect(client, plugin, "localhost", port, password);
     }
 
     public static void stopServer() {
@@ -53,12 +53,12 @@ public class TilemanMultiplayerService {
         invokeMultiplayerStateChanged();
     }
 
-    public static void connect(Client client, TilemanModePlugin plugin, String hostname, int port) {
+    public static void connect(Client client, TilemanModePlugin plugin, String hostname, int port, String password) {
         if (serverClient != null && serverClient.isAlive()) {
             return;
         }
 
-        serverClient = new TilemanClient(client, plugin, hostname, port);
+        serverClient = new TilemanClient(client, plugin, hostname, port, password);
         serverClient.start();
     }
 

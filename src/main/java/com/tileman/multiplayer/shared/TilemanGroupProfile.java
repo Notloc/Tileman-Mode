@@ -1,10 +1,7 @@
 package com.tileman.multiplayer.shared;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class TilemanGroupProfile implements Serializable {
     private String groupName;
@@ -38,5 +35,8 @@ public class TilemanGroupProfile implements Serializable {
     public boolean isMember(long accountHash) {
         return groupMemberAccountHashes.contains(String.valueOf(accountHash));
     }
-}
 
+    public List<String> getGroupMemberAccountHashes() {
+        return Collections.unmodifiableList(groupMemberAccountHashes);
+    }
+}

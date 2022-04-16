@@ -4,5 +4,7 @@ public enum TilemanPacketType {
     REGION_DATA_REQUEST,
     REGION_DATA_RESPONSE,
     TILE_UPDATE,
-    END_OF_DATA
+    END_OF_DATA,
+    VALIDATION,
+    VALIDATION_RESPONSE
 }

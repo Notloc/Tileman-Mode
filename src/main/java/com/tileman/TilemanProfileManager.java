@@ -41,6 +41,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.config.ConfigManager;
 
 import java.util.*;
@@ -377,4 +378,5 @@ public class TilemanProfileManager {
         } catch (ClassCastException e) {}
         return defaultVal;
     }
+
 }

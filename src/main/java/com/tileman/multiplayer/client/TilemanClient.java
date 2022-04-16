@@ -1,14 +1,19 @@
 package com.tileman.multiplayer.client;
 
 import com.tileman.TilemanModePlugin;
-import com.tileman.shared.TilemanModeTile;
+import com.tileman.TilemanProfileManager;
 import com.tileman.Util;
+import com.tileman.shared.TilemanModeTile;
 import com.tileman.multiplayer.shared.*;
+import com.tileman.shared.TilemanProfile;
 import lombok.Getter;
 import net.runelite.api.Client;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +22,7 @@ public class TilemanClient extends NetworkedThread {
 
     private final Client client;
     private final TilemanModePlugin plugin;
+    private final TilemanProfileManager profileManager;
 
     private final String hostname;
     private final int portNumber;
@@ -26,13 +32,18 @@ public class TilemanClient extends NetworkedThread {
     private ConcurrentOutputQueue<Object> outputQueue;
     private TilemanClientState clientState;
 
-    public TilemanClient(Client client, TilemanModePlugin plugin, String hostname, int portNumber) {
+    private TilemanProfile profile;
+    private String password;
+
+    public TilemanClient(Client client, TilemanModePlugin plugin, TilemanProfileManager profileManager, String hostname, int portNumber, String password) {
         this.client = client;
         this.plugin = plugin;
+        this.profileManager = profileManager;
 
         this.hostname = hostname;
         this.portNumber = portNumber;
         this.clientState = TilemanClientState.CONNECTING;
+        this.password = password;
     }
 
     public TilemanClientState getClientState() { return clientState; }
@@ -44,12 +55,19 @@ public class TilemanClient extends NetworkedThread {
             return;
         }
 
+        this.profile = profileManager.getActiveProfile();
+        if (profile.equals(TilemanProfile.NONE)) {
+            return;
+        }
+
         try {
             Socket socket = new Socket(hostname, portNumber);
 
             outputQueue = new ConcurrentOutputQueue<>(socket.getOutputStream());
             ObjectInputStreamBufferThread inputThread = new ObjectInputStreamBufferThread(socket.getInputStream());
             inputThread.start();
+
+            sendValidation();
 
             clientState = TilemanClientState.SYNCING;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
@@ -82,6 +100,15 @@ public class TilemanClient extends NetworkedThread {
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
         }
     }
+
+    private void sendValidation() {
+        String hashedPassword = MpUtil.sha512(this.password);
+        this.password = null;
+
+        TilemanPacket.createValidationPacket(profileManager.getActiveProfile(), hashedPassword);
+    }
+
+
 
     private void uploadTileDataToServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
         long sender = client.getAccountHash();
