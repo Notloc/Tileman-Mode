@@ -4,7 +4,7 @@ import java.io.Serializable;
 import static com.tileman.multiplayer.shared.TilemanPacketType.*;
 
 public class TilemanPacket implements Serializable {
-    public static final long SERVER_ID = 0;
+    public static final long SERVER_ID = -1;
 
     public final TilemanPacketType packetType;
     public final long sender;
