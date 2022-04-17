@@ -105,18 +105,18 @@ public class TilemanClient extends NetworkedThread {
         String hashedPassword = MpUtil.sha512(this.password);
         this.password = null;
 
-        TilemanPacket.createValidationPacket(profileManager.getActiveProfile(), hashedPassword);
+        TilemanPacket validationPacket = TilemanPacket.createValidationPacket(profileManager.getActiveProfile(), hashedPassword);
+        //outputQueue.queueData(validationPacket);
     }
 
 
 
     private void uploadTileDataToServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
-        long sender = client.getAccountHash();
          for (Integer regionId : tileData.keySet()) {
              outputQueue.queueData(
-                 TilemanPacket.createRegionDataResponse(sender, regionId),
+                 TilemanPacket.createRegionDataResponse(profile, regionId),
                  tileData.get(regionId),
-                 TilemanPacket.createEndOfDataPacket(sender)
+                 TilemanPacket.createEndOfDataPacket(profile)
              );
          }
         outputQueue.flush();
@@ -167,8 +167,8 @@ public class TilemanClient extends NetworkedThread {
     public void requestRegionData(Collection<Integer> regionIds) {
         for (int regionId : regionIds) {
             outputQueue.queueData(
-                TilemanPacket.createRegionDataRequest(client.getAccountHash(), regionId),
-                TilemanPacket.createEndOfDataPacket(client.getAccountHash())
+                TilemanPacket.createRegionDataRequest(profile, regionId),
+                TilemanPacket.createEndOfDataPacket(profile)
             );
         }
     }
@@ -176,18 +176,17 @@ public class TilemanClient extends NetworkedThread {
     public void requestRegionData(int[] regionIds) {
         for (int regionId : regionIds) {
             outputQueue.queueData(
-                    TilemanPacket.createRegionDataRequest(client.getAccountHash(), regionId),
-                    TilemanPacket.createEndOfDataPacket(client.getAccountHash())
+                    TilemanPacket.createRegionDataRequest(profile, regionId),
+                    TilemanPacket.createEndOfDataPacket(profile)
             );
         }
     }
 
     public void sendTileUpdate(TilemanModeTile tile, boolean state) {
-        long sender = client.getAccountHash();
         outputQueue.queueData(
-            TilemanPacket.createTileUpdatePacket(sender, state),
+            TilemanPacket.createTileUpdatePacket(profile, state),
             tile,
-            TilemanPacket.createEndOfDataPacket(sender)
+            TilemanPacket.createEndOfDataPacket(profile)
         );
     }
 
