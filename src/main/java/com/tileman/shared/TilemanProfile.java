@@ -25,6 +25,7 @@
 package com.tileman.shared;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import java.io.Serializable;
 
@@ -35,9 +36,23 @@ public class TilemanProfile implements Serializable {
     @Getter private final String accountHash;
     @Getter private final String profileName;
 
+    private String multiplayerGroupId;
+
     public TilemanProfile(long accountHash, String profileName) {
         this.accountHash = String.valueOf(accountHash);
         this.profileName = profileName;
+    }
+
+    public void joinMultiplayerGroup(String multiplayerGroupId) {
+        this.multiplayerGroupId = multiplayerGroupId;
+    }
+
+    public void leaveMultiplayerGroup() {
+        this.multiplayerGroupId = null;
+    }
+
+    public long getAccountHashLong() {
+        return Long.parseLong(accountHash);
     }
 
     @Override
@@ -65,8 +80,12 @@ public class TilemanProfile implements Serializable {
         return accountHash + "_region_";
     }
 
-    public String getGroupKey() {
-        return accountHash + "_group";
+    public boolean isGroupTileman() {
+        return multiplayerGroupId != null;
+    }
+
+    public String getGroupTilemanProfileKey() {
+        return isGroupTileman() ? multiplayerGroupId + "_group" : null;
     }
 
     @Override

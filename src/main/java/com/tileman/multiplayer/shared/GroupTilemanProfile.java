@@ -3,16 +3,20 @@ package com.tileman.multiplayer.shared;
 import java.io.Serializable;
 import java.util.*;
 
-public class TilemanGroupProfile implements Serializable {
-    private String groupName;
-    private String groupCreatorAccountHash;
-    private List<String> groupMemberAccountHashes = new ArrayList<>();
-    private Map<String, String> groupMemberNames = new HashMap<>();
+public class GroupTilemanProfile implements Serializable {
+    private final String groupName;
+    private final String groupCreatorAccountHash;
+    private final List<String> groupMemberAccountHashes = new ArrayList<>();
+    private final Map<String, String> groupMemberNames = new HashMap<>();
 
-    public TilemanGroupProfile(String groupName, long accountHash, String accountName) {
+    public GroupTilemanProfile(String groupName, long accountHash, String accountName) {
         this.groupName = groupName;
         this.groupCreatorAccountHash = String.valueOf(accountHash);
         addMember(accountHash, accountName);
+    }
+
+    public String getGroupCreatorAccountHash() {
+        return groupCreatorAccountHash;
     }
 
     public boolean addMember(long accountHash, String accountName) {
@@ -33,7 +37,11 @@ public class TilemanGroupProfile implements Serializable {
     }
 
     public boolean isMember(long accountHash) {
-        return groupMemberAccountHashes.contains(String.valueOf(accountHash));
+        return isMember(String.valueOf(accountHash));
+    }
+
+    public boolean isMember(String accountHash) {
+        return groupMemberAccountHashes.contains(accountHash);
     }
 
     public List<String> getGroupMemberAccountHashes() {

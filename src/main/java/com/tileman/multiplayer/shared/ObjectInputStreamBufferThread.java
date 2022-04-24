@@ -17,7 +17,6 @@ public class ObjectInputStreamBufferThread extends Thread {
 
     @Override
     public void run() {
-
         try {
             ObjectInputStream input = new ObjectInputStream(rawInputStream);
             while (running) {
@@ -30,36 +29,33 @@ public class ObjectInputStreamBufferThread extends Thread {
         }
     }
 
-    public TilemanPacket getNextPacket() {
-        if (queuedInputData.peek() != null) {
-            return (TilemanPacket)queuedInputData.remove();
-        }
-        return null;
+    public TilemanPacket waitForNextPacket(NetworkedThread host) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
+        return waitForNextObject(host);
     }
 
-    public Object getNextObject() {
+    public <T> T waitForNextObject(NetworkedThread host) throws NetworkShutdownException, InterruptedException, NetworkTimeoutException, UnexpectedPacketTypeException {
+        ValueHolder<Object> objectHolder = new ValueHolder<>(null);
+        host.executeInBusyLoop(() -> {
+           Object obj = tryGetNextObject();
+            if (obj != null) {
+                objectHolder.value = obj;
+                return BusyFunction.Status.FINISHED;
+            } else {
+                return BusyFunction.Status.CONTINUE;
+            }
+        });
+        return (T)objectHolder.value;
+    }
+
+    public TilemanPacket tryGetNextPacket() {
+        return (TilemanPacket)tryGetNextObject();
+    }
+
+    public Object tryGetNextObject() {
         if (queuedInputData.peek() != null) {
             return queuedInputData.remove();
         }
         return null;
-    }
-
-    public Object waitForData(NetworkedThread thread) throws ShutdownException, InterruptedException {
-        Object data = null;
-        while (!thread.isShutdown()) {
-            data = getNextObject();
-            if (data != null) {
-                break;
-            } else {
-                sleep(10);
-            }
-        }
-
-        if (thread.isShutdown()) {
-            throw new ShutdownException();
-        }
-
-        return data;
     }
 
     /**

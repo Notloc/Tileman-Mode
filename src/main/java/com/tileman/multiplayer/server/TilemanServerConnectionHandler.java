@@ -17,6 +17,8 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
 
     private ConcurrentOutputQueue<Object> outputQueue;
 
+    private TilemanProfile connectionProfile;
+
     public TilemanServerConnectionHandler(TilemanServer server, Socket connection) throws IOException {
         this.server = server;
         this.connection = connection;
@@ -42,15 +44,17 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
             while (!server.isShutdown()) {
                 outputQueue.flush();
 
-                TilemanPacket packet = inputThread.getNextPacket();
+                TilemanPacket packet = inputThread.tryGetNextPacket();
                 if (packet != null) {
                     handlePacket(packet, inputThread);
                 }
                 sleep(50);
             }
-        } catch (ShutdownException e) {
+        } catch (NetworkShutdownException e) {
             // Do nothing
         } catch (IOException | ClassNotFoundException | InterruptedException | UnexpectedPacketTypeException e) {
+            e.printStackTrace();
+        } catch (NetworkTimeoutException e) {
             e.printStackTrace();
         } finally {
             try {
@@ -67,34 +71,33 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
         }
     }
 
-    private boolean awaitAuthentication(ObjectInputStreamBufferThread inputThread) throws InterruptedException, UnexpectedPacketTypeException {
-        ValueHolder<Boolean> valueHolder = new ValueHolder<>(false);
-        server.executeInBusyLoop(() -> {
-            TilemanPacket packet = inputThread.getNextPacket();
-            if (packet != null) {
-                assertPacketType(packet, TilemanPacketType.AUTHENTICATION);
-                if (server.isRequiresPassword()) {
-                    String hashedPassword = packet.message;
-                    valueHolder.value = server.authenticatePassword(hashedPassword);
-                } else {
-                    valueHolder.value = true;
-                }
-                return BusyFunction.Status.FINISHED;
-            }
-            return BusyFunction.Status.CONTINUE;
-        });
-        return valueHolder.value;
+    private boolean awaitAuthentication(ObjectInputStreamBufferThread inputThread) throws InterruptedException, UnexpectedPacketTypeException, NetworkShutdownException, NetworkTimeoutException {
+        TilemanPacket packet = inputThread.waitForNextPacket(server);
+        assertPacketType(packet, TilemanPacketType.AUTHENTICATION);
+        TilemanProfile profile = inputThread.waitForNextObject(server);
+
+        if (server.getMultiplayerGroup().isMember(profile.getAccountHash())) {
+            return true;
+        } else if (server.isRequiresPassword()) {
+            String hashedPassword = packet.message;
+            boolean passwordMatches = server.authenticatePassword(hashedPassword);
+            // add member to group
+            return passwordMatches;
+        }
+
+        // add member to group
+        return true;
     }
 
     private void sendAuthenticationResponse(boolean authenticated) throws IOException {
         outputQueue.queueData(
-                TilemanPacket.createAuthenticationResponsePacket(TilemanProfile.NONE, authenticated),
-                TilemanPacket.createEndOfDataPacket(TilemanProfile.NONE)
+                TilemanPacket.createAuthenticationResponsePacket(authenticated),
+                TilemanPacket.createEndOfDataPacket()
         );
         outputQueue.flush();
     }
 
-    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
+    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
         switch (packet.packetType) {
             case REGION_DATA_REQUEST:
                 handleRegionDataRequest(packet, input);
@@ -110,45 +113,43 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
         }
     }
 
-    private void handleRegionDataRequest(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
-        validateEndOfDataPacket(input.waitForData(this));
+    private void handleRegionDataRequest(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        assertPacketType(input.waitForNextPacket(server), TilemanPacketType.END_OF_DATA);
 
         int regionId = Integer.parseInt(packet.message);
-        Set<TilemanModeTile> tileSet = server.gatherTilesInRegionForUser(packet.sender, regionId);
+        Set<TilemanModeTile> tileSet = server.gatherTilesInRegionForUser(connectionProfile.getAccountHashLong(), regionId);
         List<TilemanModeTile> tiles = new ArrayList<>();
         for (TilemanModeTile tile : tileSet) {
             tiles.add(tile);
         }
 
         outputQueue.queueData(
-            TilemanPacket.createRegionDataResponse(TilemanProfile.NONE, regionId),
+            TilemanPacket.createRegionDataResponse(regionId),
             tiles,
-            TilemanPacket.createEndOfDataPacket(TilemanProfile.NONE)
+            TilemanPacket.createEndOfDataPacket()
         );
     }
 
-    private void handleRegionDataResponse(TilemanPacket packet, ObjectInputStreamBufferThread input) throws ShutdownException, InterruptedException, UnexpectedPacketTypeException {
+    private void handleRegionDataResponse(TilemanPacket packet, ObjectInputStreamBufferThread input) throws NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
         int regionId = Integer.parseInt(packet.message);
 
         while (!server.isShutdown()) {
-            Object object = input.waitForData(server);
+            Object object = input.waitForNextObject(server);
             if (object instanceof List) {
                 List<TilemanModeTile> tiles = (List<TilemanModeTile>)object;
-                server.addTileData(packet.sender, regionId, tiles);
+                server.addTileData(connectionProfile.getAccountHashLong(), regionId, tiles);
             } else {
-                validateEndOfDataPacket(object);
+                assertPacketType((TilemanPacket)object, TilemanPacketType.END_OF_DATA);
                 break;
             }
         }
     }
 
-    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, ShutdownException, UnexpectedPacketTypeException {
+    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        TilemanModeTile tile = input.waitForNextObject(this);
+        assertPacketType(input.waitForNextPacket(server), TilemanPacketType.END_OF_DATA);
+
         boolean state = Boolean.parseBoolean(packet.message);
-
-        Object object = input.waitForData(this);
-        TilemanModeTile tile = (TilemanModeTile)object;
-        validateEndOfDataPacket(input.waitForData(this));
-
-        server.setTile(packet.sender, tile, state);
+        server.setTile(connectionProfile.getAccountHashLong(), tile, state);
     }
 }

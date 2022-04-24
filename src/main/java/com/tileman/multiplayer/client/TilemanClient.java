@@ -19,7 +19,6 @@ public class TilemanClient extends NetworkedThread {
 
     private final Client client;
     private final TilemanModePlugin plugin;
-    private final TilemanProfileManager profileManager;
 
     private final String hostname;
     private final int portNumber;
@@ -35,7 +34,7 @@ public class TilemanClient extends NetworkedThread {
     public TilemanClient(Client client, TilemanModePlugin plugin, TilemanProfileManager profileManager, String hostname, int portNumber, String password) {
         this.client = client;
         this.plugin = plugin;
-        this.profileManager = profileManager;
+        this.profile = profileManager.getActiveProfile();
 
         this.hostname = hostname;
         this.portNumber = portNumber;
@@ -52,7 +51,7 @@ public class TilemanClient extends NetworkedThread {
             return;
         }
 
-        this.profile = profileManager.getActiveProfile();
+
         if (profile.equals(TilemanProfile.NONE)) {
             return;
         }
@@ -82,7 +81,7 @@ public class TilemanClient extends NetworkedThread {
             while (!isShutdown()) {
                 outputQueue.flush();
 
-                TilemanPacket packet = inputThread.getNextPacket();
+                TilemanPacket packet = inputThread.tryGetNextPacket();
                 if (packet != null) {
                     handlePacket(packet, inputThread);
                 }
@@ -91,7 +90,7 @@ public class TilemanClient extends NetworkedThread {
             }
             System.out.println("Closing!");
             socket.close();
-        } catch (ShutdownException e) {
+        } catch (NetworkShutdownException e) {
             // Do nothing
         }
         catch (IOException | ClassNotFoundException | InterruptedException | UnexpectedPacketTypeException e) {
@@ -107,15 +106,16 @@ public class TilemanClient extends NetworkedThread {
         this.password = null;
 
         outputQueue.queueData(
-                TilemanPacket.createAuthenticationPacket(profileManager.getActiveProfile(), hashedPassword),
-                TilemanPacket.createEndOfDataPacket(profile)
+                TilemanPacket.createAuthenticationPacket(hashedPassword),
+                profile,
+                TilemanPacket.createEndOfDataPacket()
         );
         outputQueue.flush();
     }
 
     private boolean awaitAuthenticationResponse(ObjectInputStreamBufferThread inputThread) throws InterruptedException, UnexpectedPacketTypeException {
         while (!isShutdown()) {
-            TilemanPacket packet = inputThread.getNextPacket();
+            TilemanPacket packet = inputThread.tryGetNextPacket();
             if (packet != null) {
                 assertPacketType(packet, TilemanPacketType.AUTHENTICATION_RESPONSE);
                 return Boolean.parseBoolean(packet.message);
@@ -128,15 +128,15 @@ public class TilemanClient extends NetworkedThread {
     private void uploadTileDataToServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
          for (Integer regionId : tileData.keySet()) {
              outputQueue.queueData(
-                 TilemanPacket.createRegionDataResponse(profile, regionId),
+                 TilemanPacket.createRegionDataResponse(regionId),
                  tileData.get(regionId),
-                 TilemanPacket.createEndOfDataPacket(profile)
+                 TilemanPacket.createEndOfDataPacket()
              );
          }
         outputQueue.flush();
     }
 
-    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, InterruptedException, ShutdownException, UnexpectedPacketTypeException {
+    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException {
         switch (packet.packetType) {
             case REGION_DATA_RESPONSE:
                 handleIncomingRegionData(packet, input);
@@ -149,7 +149,7 @@ public class TilemanClient extends NetworkedThread {
         }
     }
 
-    private void handleIncomingRegionData(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, ShutdownException, UnexpectedPacketTypeException {
+    private void handleIncomingRegionData(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException {
         int regionId = Integer.parseInt(packet.message);
         while (!isShutdown()) {
             Object object = input.waitForData(this);
@@ -163,7 +163,7 @@ public class TilemanClient extends NetworkedThread {
         }
     }
 
-    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, ShutdownException, UnexpectedPacketTypeException {
+    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException {
         Object object = input.waitForData(this);
         TilemanModeTile tile = (TilemanModeTile)object;
         validateEndOfDataPacket(input.waitForData(this));
@@ -181,8 +181,8 @@ public class TilemanClient extends NetworkedThread {
     public void requestRegionData(Collection<Integer> regionIds) {
         for (int regionId : regionIds) {
             outputQueue.queueData(
-                TilemanPacket.createRegionDataRequest(profile, regionId),
-                TilemanPacket.createEndOfDataPacket(profile)
+                TilemanPacket.createRegionDataRequest(regionId),
+                TilemanPacket.createEndOfDataPacket()
             );
         }
     }
@@ -190,17 +190,17 @@ public class TilemanClient extends NetworkedThread {
     public void requestRegionData(int[] regionIds) {
         for (int regionId : regionIds) {
             outputQueue.queueData(
-                    TilemanPacket.createRegionDataRequest(profile, regionId),
-                    TilemanPacket.createEndOfDataPacket(profile)
+                    TilemanPacket.createRegionDataRequest(regionId),
+                    TilemanPacket.createEndOfDataPacket()
             );
         }
     }
 
     public void sendTileUpdate(TilemanModeTile tile, boolean state) {
         outputQueue.queueData(
-            TilemanPacket.createTileUpdatePacket(profile, state),
+            TilemanPacket.createTileUpdatePacket(state),
             tile,
-            TilemanPacket.createEndOfDataPacket(profile)
+            TilemanPacket.createEndOfDataPacket()
         );
     }
 
