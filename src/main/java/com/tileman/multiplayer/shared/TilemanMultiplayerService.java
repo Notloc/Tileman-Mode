@@ -42,7 +42,7 @@ public class TilemanMultiplayerService {
         if (server != null && server.isAlive()) {
             return;
         }
-        server = new TilemanServer(port);
+        server = new TilemanServer(port, "");
         server.start();
 
         connect(client, plugin, profileManager, "localhost", port, password);

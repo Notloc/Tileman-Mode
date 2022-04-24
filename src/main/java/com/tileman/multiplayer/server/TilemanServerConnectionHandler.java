@@ -2,6 +2,7 @@ package com.tileman.multiplayer.server;
 
 import com.tileman.shared.TilemanModeTile;
 import com.tileman.multiplayer.shared.*;
+import com.tileman.shared.TilemanProfile;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -32,7 +33,13 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
             inputThread = new ObjectInputStreamBufferThread(connection.getInputStream());
             inputThread.start();
 
-            while (!connection.isClosed()) {
+            boolean authenticated = awaitAuthentication(inputThread);
+            sendAuthenticationResponse(authenticated);
+            if (!authenticated) {
+                return;
+            }
+
+            while (!server.isShutdown()) {
                 outputQueue.flush();
 
                 TilemanPacket packet = inputThread.getNextPacket();
@@ -46,12 +53,45 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
         } catch (IOException | ClassNotFoundException | InterruptedException | UnexpectedPacketTypeException e) {
             e.printStackTrace();
         } finally {
+            try {
+                connection.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
             server.removeConnection(connection);
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
             if (inputThread != null) {
-                inputThread.teardown();
+                inputThread.forceStop();
             }
         }
+    }
+
+    private boolean awaitAuthentication(ObjectInputStreamBufferThread inputThread) throws InterruptedException, UnexpectedPacketTypeException {
+        ValueHolder<Boolean> valueHolder = new ValueHolder<>(false);
+        server.executeInBusyLoop(() -> {
+            TilemanPacket packet = inputThread.getNextPacket();
+            if (packet != null) {
+                assertPacketType(packet, TilemanPacketType.AUTHENTICATION);
+                if (server.isRequiresPassword()) {
+                    String hashedPassword = packet.message;
+                    valueHolder.value = server.authenticatePassword(hashedPassword);
+                } else {
+                    valueHolder.value = true;
+                }
+                return BusyFunction.Status.FINISHED;
+            }
+            return BusyFunction.Status.CONTINUE;
+        });
+        return valueHolder.value;
+    }
+
+    private void sendAuthenticationResponse(boolean authenticated) throws IOException {
+        outputQueue.queueData(
+                TilemanPacket.createAuthenticationResponsePacket(TilemanProfile.NONE, authenticated),
+                TilemanPacket.createEndOfDataPacket(TilemanProfile.NONE)
+        );
+        outputQueue.flush();
     }
 
     private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, ShutdownException, InterruptedException, UnexpectedPacketTypeException {
@@ -81,9 +121,9 @@ public class TilemanServerConnectionHandler extends NetworkedThread {
         }
 
         outputQueue.queueData(
-            TilemanPacket.createRegionDataResponse(TilemanPacket.SERVER_ID, regionId),
+            TilemanPacket.createRegionDataResponse(TilemanProfile.NONE, regionId),
             tiles,
-            TilemanPacket.createEndOfDataPacket(TilemanPacket.SERVER_ID)
+            TilemanPacket.createEndOfDataPacket(TilemanProfile.NONE)
         );
     }
 

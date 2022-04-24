@@ -11,9 +11,6 @@ import net.runelite.api.Client;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +64,11 @@ public class TilemanClient extends NetworkedThread {
             ObjectInputStreamBufferThread inputThread = new ObjectInputStreamBufferThread(socket.getInputStream());
             inputThread.start();
 
-            sendValidation();
+            sendAuthentication();
+            clientState = TilemanClientState.AUTHENTICATING;
+            if (!awaitAuthenticationResponse(inputThread)) {
+                return;
+            }
 
             clientState = TilemanClientState.SYNCING;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
@@ -101,15 +102,28 @@ public class TilemanClient extends NetworkedThread {
         }
     }
 
-    private void sendValidation() {
+    private void sendAuthentication() throws IOException {
         String hashedPassword = MpUtil.sha512(this.password);
         this.password = null;
 
-        TilemanPacket validationPacket = TilemanPacket.createValidationPacket(profileManager.getActiveProfile(), hashedPassword);
-        //outputQueue.queueData(validationPacket);
+        outputQueue.queueData(
+                TilemanPacket.createAuthenticationPacket(profileManager.getActiveProfile(), hashedPassword),
+                TilemanPacket.createEndOfDataPacket(profile)
+        );
+        outputQueue.flush();
     }
 
-
+    private boolean awaitAuthenticationResponse(ObjectInputStreamBufferThread inputThread) throws InterruptedException, UnexpectedPacketTypeException {
+        while (!isShutdown()) {
+            TilemanPacket packet = inputThread.getNextPacket();
+            if (packet != null) {
+                assertPacketType(packet, TilemanPacketType.AUTHENTICATION_RESPONSE);
+                return Boolean.parseBoolean(packet.message);
+            }
+            sleep(100);
+        }
+        return false;
+    }
 
     private void uploadTileDataToServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
          for (Integer regionId : tileData.keySet()) {

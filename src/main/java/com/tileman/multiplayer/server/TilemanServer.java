@@ -2,6 +2,7 @@ package com.tileman.multiplayer.server;
 
 import com.tileman.shared.TilemanModeTile;
 import com.tileman.multiplayer.shared.*;
+import com.tileman.shared.TilemanProfile;
 import lombok.Getter;
 
 import java.io.*;
@@ -15,6 +16,7 @@ public class TilemanServer extends NetworkedThread {
     @Getter
     private final int portNumber;
     private ServerSocket serverSocket;
+    private String hashedPassword;
 
     // Data structure gore, I'm sorry.
     // It's a thread safe map by userHash of each user's tile data. Tile data is mapped by region and stored in hashsets.
@@ -24,8 +26,9 @@ public class TilemanServer extends NetworkedThread {
 
     private final Set<Socket> activeConnections = ConcurrentHashMap.newKeySet();
 
-    public TilemanServer(int portNumber) {
+    public TilemanServer(int portNumber, String password) {
         this.portNumber = portNumber;
+        this.hashedPassword = MpUtil.sha512(password);
     }
 
     @Override
@@ -107,9 +110,11 @@ public class TilemanServer extends NetworkedThread {
             playerTileData.get(sender).remove(tile.getRegionId(), tile);
         }
         // Send the update to all connected players
-        TilemanPacket updatePacket = TilemanPacket.createTileUpdatePacket(TilemanPacket.SERVER_ID, state);
-        TilemanPacket eod = TilemanPacket.createEndOfDataPacket(TilemanPacket.SERVER_ID);
-        queueOutputForAllConnections(updatePacket, tile, eod);
+        queueOutputForAllConnections(
+                TilemanPacket.createTileUpdatePacket(TilemanProfile.NONE, state),
+                tile,
+                TilemanPacket.createEndOfDataPacket(TilemanProfile.NONE)
+        );
     }
 
     private void ensurePlayerEntry(long playerId) {
@@ -127,5 +132,16 @@ public class TilemanServer extends NetworkedThread {
     private void queueOutputForConnection(Socket connection, Object... data) {
         ConcurrentOutputQueue<Object> outputQueue = outputQueueBySocket.get(connection);
         outputQueue.queueData(data);
+    }
+
+    public boolean isRequiresPassword() {
+        return hashedPassword != null && !hashedPassword.isEmpty();
+    }
+
+    public boolean authenticatePassword(String hashedPassword) {
+        if (this.hashedPassword == null || this.hashedPassword.isEmpty()) {
+            return true;
+        }
+        return this.hashedPassword.equals(hashedPassword);
     }
 }

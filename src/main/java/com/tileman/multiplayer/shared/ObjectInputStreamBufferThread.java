@@ -66,7 +66,7 @@ public class ObjectInputStreamBufferThread extends Thread {
      * Stops the BufferThread
      * Takes up to 0.5s if blocked by I/O
      */
-    public void teardown() {
+    public void forceStop() {
         running = false;
 
         Thread target = this;
