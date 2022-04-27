@@ -5,7 +5,7 @@ public abstract class NetworkedThread extends Thread implements IShutdown {
     protected boolean isShuttingDown = false;
     public boolean isShutdown() { return isShuttingDown; }
 
-    protected static void assertPacketType(TilemanPacket packet, TilemanPacketType expectedType) throws UnexpectedPacketTypeException {
+    public static void assertPacketType(TilemanPacket packet, TilemanPacketType expectedType) throws UnexpectedPacketTypeException {
         if (packet.packetType != expectedType) {
             throw new UnexpectedPacketTypeException(String.format("Unexpected packet type. Expected %s but received %s.", expectedType, packet.packetType));
         }

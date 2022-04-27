@@ -30,6 +30,17 @@ public class TilemanPacket implements Serializable {
         return new TilemanPacket(REGION_DATA_RESPONSE, String.valueOf(regionId));
     }
 
+    // client
+        // client connects
+            // asks for all tile data for other players
+    
+    // server
+        // client connections
+            // asks for all data from player
+
+
+
+
     public static TilemanPacket createTileUpdatePacket(boolean state) {
         return new TilemanPacket(TILE_UPDATE, Boolean.toString(state));
     }

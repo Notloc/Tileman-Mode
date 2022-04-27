@@ -11,6 +11,7 @@ import net.runelite.api.Client;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +52,6 @@ public class TilemanClient extends NetworkedThread {
             return;
         }
 
-
         if (profile.equals(TilemanProfile.NONE)) {
             return;
         }
@@ -72,7 +72,7 @@ public class TilemanClient extends NetworkedThread {
             clientState = TilemanClientState.SYNCING;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
 
-            uploadTileDataToServer(plugin.getTilesByRegion());
+            syncTileDataWithServer(plugin.getTilesByRegion());
 
             clientState = TilemanClientState.CONNECTED;
             TilemanMultiplayerService.invokeMultiplayerStateChanged();
@@ -93,7 +93,7 @@ public class TilemanClient extends NetworkedThread {
         } catch (NetworkShutdownException e) {
             // Do nothing
         }
-        catch (IOException | ClassNotFoundException | InterruptedException | UnexpectedPacketTypeException e) {
+        catch (IOException | ClassNotFoundException | InterruptedException | UnexpectedPacketTypeException | NetworkTimeoutException e) {
             e.printStackTrace();
         } finally {
             clientState = TilemanClientState.DISCONNECTED;
@@ -125,18 +125,44 @@ public class TilemanClient extends NetworkedThread {
         return false;
     }
 
-    private void uploadTileDataToServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
-         for (Integer regionId : tileData.keySet()) {
-             outputQueue.queueData(
-                 TilemanPacket.createRegionDataResponse(regionId),
-                 tileData.get(regionId),
-                 TilemanPacket.createEndOfDataPacket()
-             );
-         }
+    private void syncTileDataWithServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
+        // sendRegionHashes()
+        // receiveUpdateRequests();
+        // sendUpdates
+        // requestRegionHashesForOthers()
+        // requestUpdates
+        // receiveUpdatesForOthers
+
+
+    }
+
+    private void sendRegionHashesToServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
+        List<RegionDataHash> regionHashes = new ArrayList<>();
+        tileData.keySet().stream().forEach(regionId -> {
+            regionHashes.add(new RegionDataHash(regionId, tileData.get(regionId).hashCode()));
+        });
+
+        outputQueue.queueData(
+                TilemanPacket.createRegionDataResponse(regionId),
+                new RegionDataHash(regionId, regionData.hashCode()),
+                TilemanPacket.createEndOfDataPacket()
+        );
+
         outputQueue.flush();
     }
 
-    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException {
+    private void sendRegionDataToServer(Map<Integer, List<TilemanModeTile>> tileData) throws IOException {
+        for (Integer regionId : tileData.keySet()) {
+            outputQueue.queueData(
+                    TilemanPacket.createRegionDataResponse(regionId),
+                    tileData.get(regionId),
+                    TilemanPacket.createEndOfDataPacket()
+            );
+        }
+        outputQueue.flush();
+    }
+
+    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
         switch (packet.packetType) {
             case REGION_DATA_RESPONSE:
                 handleIncomingRegionData(packet, input);
@@ -149,24 +175,24 @@ public class TilemanClient extends NetworkedThread {
         }
     }
 
-    private void handleIncomingRegionData(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException {
+    private void handleIncomingRegionData(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
         int regionId = Integer.parseInt(packet.message);
         while (!isShutdown()) {
-            Object object = input.waitForData(this);
+            Object object = input.waitForNextObject(this);
             if (object instanceof List) {
                 List<TilemanModeTile> tiles = (List<TilemanModeTile>) object;
                 multiplayerTileData.addAll(regionId, tiles);
             } else {
-                validateEndOfDataPacket(object);
+                assertPacketType((TilemanPacket)object, TilemanPacketType.END_OF_DATA);
                 break;
             }
         }
     }
 
-    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException {
-        Object object = input.waitForData(this);
+    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        Object object = input.waitForNextObject(this);
         TilemanModeTile tile = (TilemanModeTile)object;
-        validateEndOfDataPacket(input.waitForData(this));
+        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
 
         if (multiplayerTileData.containsKey(tile.getRegionId())) {
             boolean tileState = Boolean.parseBoolean(packet.message);

@@ -1,5 +1,7 @@
 package com.tileman.multiplayer.shared;
 
+import com.tileman.shared.TilemanProfile;
+
 import java.io.Serializable;
 import java.util.*;
 
@@ -19,6 +21,9 @@ public class GroupTilemanProfile implements Serializable {
         return groupCreatorAccountHash;
     }
 
+    public boolean addMember(TilemanProfile profile) {
+        return addMember(profile.getAccountHashLong(), profile.getProfileName());
+    }
     public boolean addMember(long accountHash, String accountName) {
         String accountHashString = String.valueOf(accountHash);
         if (groupMemberAccountHashes.contains(accountHashString)) {

@@ -18,10 +18,11 @@ public class TilemanServer extends NetworkedThread {
     private ServerSocket serverSocket;
     private String hashedPassword;
 
+    @Deprecated
     @Getter private GroupTilemanProfile multiplayerGroup;
 
     // Data structure gore, I'm sorry.
-    // It's a thread safe map by userHash of each user's tile data. Tile data is mapped by region and stored in hashsets.
+    // It's a thread safe map, keyed by account hash, of each user's tile data. Tile data is mapped by region and stored in hashsets.
     ConcurrentHashMap<Long, ConcurrentSetMap<Integer, TilemanModeTile>> playerTileData = new ConcurrentHashMap<>();
 
     ConcurrentHashMap<Socket, ConcurrentOutputQueue<Object>> outputQueueBySocket = new ConcurrentHashMap<>();
