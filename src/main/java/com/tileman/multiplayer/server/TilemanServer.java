@@ -2,7 +2,6 @@ package com.tileman.multiplayer.server;
 
 import com.tileman.shared.TilemanModeTile;
 import com.tileman.multiplayer.shared.*;
-import com.tileman.shared.TilemanProfile;
 import lombok.Getter;
 
 import java.io.*;
@@ -11,7 +10,7 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class TilemanServer extends NetworkedThread {
+public class TilemanServer extends TilemanMultiplayerThread {
 
     @Getter
     private final int portNumber;
@@ -23,7 +22,7 @@ public class TilemanServer extends NetworkedThread {
 
     // Data structure gore, I'm sorry.
     // It's a thread safe map, keyed by account hash, of each user's tile data. Tile data is mapped by region and stored in hashsets.
-    ConcurrentHashMap<Long, ConcurrentSetMap<Integer, TilemanModeTile>> playerTileData = new ConcurrentHashMap<>();
+    ConcurrentHashMap<Long, ConcurrentSetMap<Integer, TilemanModeTile>> tileDataByPlayer = new ConcurrentHashMap<>();
 
     ConcurrentHashMap<Socket, ConcurrentOutputQueue<Object>> outputQueueBySocket = new ConcurrentHashMap<>();
 
@@ -89,11 +88,11 @@ public class TilemanServer extends NetworkedThread {
     Set<TilemanModeTile> gatherTilesInRegionForUser(long userId, int regionId) {
         Set<TilemanModeTile> gatheredRegionData = new HashSet<>();
 
-        for (long id : playerTileData.keySet()) {
+        for (long id : tileDataByPlayer.keySet()) {
             if (id == userId) {
                 continue; // Skip sending a user their own tiles
             }
-            Set<TilemanModeTile> regionData = playerTileData.get(id).get(regionId);
+            Set<TilemanModeTile> regionData = tileDataByPlayer.get(id).get(regionId);
             gatheredRegionData.addAll(regionData);
         }
         return gatheredRegionData;
@@ -101,16 +100,16 @@ public class TilemanServer extends NetworkedThread {
 
     void addTileData(long playerId, int regionId, List<TilemanModeTile> tiles) {
         ensurePlayerEntry(playerId);
-        playerTileData.get(playerId).addAll(regionId, tiles);
+        tileDataByPlayer.get(playerId).addAll(regionId, tiles);
     }
 
     void setTile(long sender, TilemanModeTile tile, boolean state) {
         ensurePlayerEntry(sender);
 
         if (state) {
-            playerTileData.get(sender).add(tile.getRegionId(), tile);
+            tileDataByPlayer.get(sender).add(tile.getRegionId(), tile);
         } else {
-            playerTileData.get(sender).remove(tile.getRegionId(), tile);
+            tileDataByPlayer.get(sender).remove(tile.getRegionId(), tile);
         }
         // Send the update to all connected players
         queueOutputForAllConnections(
@@ -121,8 +120,8 @@ public class TilemanServer extends NetworkedThread {
     }
 
     private void ensurePlayerEntry(long playerId) {
-        if (!playerTileData.containsKey(playerId)) {
-            playerTileData.put(playerId, new ConcurrentSetMap<>());
+        if (!tileDataByPlayer.containsKey(playerId)) {
+            tileDataByPlayer.put(playerId, new ConcurrentSetMap<>());
         }
     }
 

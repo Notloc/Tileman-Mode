@@ -22,12 +22,12 @@ public class TilemanPacket implements Serializable {
         return new TilemanPacket(AUTHENTICATION_RESPONSE, Boolean.toString(isValidated));
     }
 
-    public static TilemanPacket createRegionDataRequest(int regionId) {
-        return new TilemanPacket(REGION_DATA_REQUEST, String.valueOf(regionId));
+    public static TilemanPacket createRegionDataRequest() {
+        return new TilemanPacket(REGION_DATA_REQUEST, "");
     }
 
-    public static TilemanPacket createRegionDataResponse(int regionId) {
-        return new TilemanPacket(REGION_DATA_RESPONSE, String.valueOf(regionId));
+    public static TilemanPacket createRegionDataResponse() {
+        return new TilemanPacket(REGION_DATA_RESPONSE, "");
     }
 
     // client
@@ -37,6 +37,21 @@ public class TilemanPacket implements Serializable {
     // server
         // client connections
             // asks for all data from player
+
+
+    public static TilemanPacket createTileSyncRequest() {
+        return new TilemanPacket(TILE_SYNC_REQUEST, "");
+    }
+
+
+    public static TilemanPacket createRegionHashReport() {
+        return new TilemanPacket(REGION_HASH_REPORT, "");
+    }
+
+
+
+
+
 
 
 

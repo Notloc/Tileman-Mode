@@ -1,8 +1,6 @@
 package com.tileman.multiplayer.shared;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -28,6 +26,10 @@ public class ConcurrentSetMap<K,V> {
         internalMap.get(key).addAll(val);
     }
 
+    public void addAll(K key, V[] val) {
+        addAll(key, Arrays.asList(val));
+    }
+
     public boolean remove(K key, V val) {
         if (!internalMap.containsKey(key)) {
             return false;
@@ -35,8 +37,16 @@ public class ConcurrentSetMap<K,V> {
         return internalMap.get(key).remove(val);
     }
 
+    public Set<V> remove(K key) {
+        return internalMap.remove(key);
+    }
+
     public boolean containsKey(K key) {
         return internalMap.containsKey(key);
+    }
+
+    public ConcurrentHashMap.KeySetView<K, Set<V>> keySet() {
+        return internalMap.keySet();
     }
 
     public Set<V> get(K key) {

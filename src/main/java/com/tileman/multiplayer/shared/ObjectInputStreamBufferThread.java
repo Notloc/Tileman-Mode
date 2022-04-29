@@ -29,11 +29,11 @@ public class ObjectInputStreamBufferThread extends Thread {
         }
     }
 
-    public TilemanPacket waitForNextPacket(NetworkedThread host) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
+    public TilemanPacket waitForNextPacket(TilemanMultiplayerThread host) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
         return waitForNextObject(host);
     }
 
-    public <T> T waitForNextObject(NetworkedThread host) throws NetworkShutdownException, InterruptedException, NetworkTimeoutException, UnexpectedPacketTypeException {
+    public <T> T waitForNextObject(TilemanMultiplayerThread host) throws NetworkShutdownException, InterruptedException, NetworkTimeoutException, UnexpectedPacketTypeException {
         ValueHolder<Object> objectHolder = new ValueHolder<>(null);
         host.executeInBusyLoop(() -> {
            Object obj = tryGetNextObject();

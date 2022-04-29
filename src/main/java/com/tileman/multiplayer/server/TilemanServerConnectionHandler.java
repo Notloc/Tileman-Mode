@@ -7,17 +7,17 @@ import com.tileman.shared.TilemanProfile;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
-public class TilemanServerConnectionHandler extends Thread {
+public class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
 
     private TilemanServer server;
     Socket connection;
 
-    private ConcurrentOutputQueue<Object> outputQueue;
-
     private TilemanProfile connectionProfile;
+    private ObjectInputStreamBufferThread inputThread;
 
     public TilemanServerConnectionHandler(TilemanServer server, Socket connection) throws IOException {
         this.server = server;
@@ -27,9 +27,8 @@ public class TilemanServerConnectionHandler extends Thread {
     }
 
     @Override
-    public void run() {
+    protected boolean onStart() {
         TilemanMultiplayerService.invokeMultiplayerStateChanged();
-        ObjectInputStreamBufferThread inputThread = null;
 
         try {
             inputThread = new ObjectInputStreamBufferThread(connection.getInputStream());
@@ -37,38 +36,21 @@ public class TilemanServerConnectionHandler extends Thread {
 
             boolean authenticated = awaitAuthentication(inputThread);
             sendAuthenticationResponse(authenticated);
-            if (!authenticated) {
-                return;
-            }
-
-            while (!server.isShutdown()) {
-                outputQueue.flush();
-
-                TilemanPacket packet = inputThread.tryGetNextPacket();
-                if (packet != null) {
-                    handlePacket(packet, inputThread);
-                }
-                sleep(50);
+            if (authenticated) {
+                return true;
             }
         } catch (NetworkShutdownException e) {
-            // Do nothing
-        } catch (IOException | ClassNotFoundException | InterruptedException | UnexpectedPacketTypeException e) {
+            e.printStackTrace();
+        } catch (UnexpectedPacketTypeException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (NetworkTimeoutException e) {
             e.printStackTrace();
-        } finally {
-            try {
-                connection.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            server.removeConnection(connection);
-            TilemanMultiplayerService.invokeMultiplayerStateChanged();
-            if (inputThread != null) {
-                inputThread.forceStop();
-            }
         }
+        return false;
     }
 
     private boolean awaitAuthentication(ObjectInputStreamBufferThread inputThread) throws InterruptedException, UnexpectedPacketTypeException, NetworkShutdownException, NetworkTimeoutException {
@@ -98,59 +80,74 @@ public class TilemanServerConnectionHandler extends Thread {
         outputQueue.flush();
     }
 
-    private void handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
+    @Override
+    protected void onShutdown() {
+        try {
+            if (!connection.isClosed()) {
+                connection.close();
+            }
+        } catch (IOException e) {}
+
+        server.removeConnection(connection);
+        TilemanMultiplayerService.invokeMultiplayerStateChanged();
+        if (inputThread != null) {
+            inputThread.forceStop();
+        }
+    }
+
+
+    @Override
+    protected void onUpdate() throws NetworkShutdownException, NetworkTimeoutException {
+        try {
+            outputQueue.flush();
+
+            TilemanPacket packet = inputThread.tryGetNextPacket();
+            if (packet != null) {
+                handlePacket(packet, inputThread);
+            }
+        } catch (UnexpectedPacketTypeException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    protected boolean handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        if (super.handlePacket(packet, input)) {
+            return true;
+        }
+
         switch (packet.packetType) {
-            case REGION_DATA_REQUEST:
-                handleRegionDataRequest(packet, input);
-                break;
-            case TILE_UPDATE:
-                handleTileUpdate(packet, input);
-                break;
-            case REGION_DATA_RESPONSE:
-                handleRegionDataResponse(packet, input);
+            case TILE_SYNC_REQUEST:
+                handleTileSyncRequest();
                 break;
             default:
                 throw new IOException("Unexpected packet type in server: " + packet.packetType);
         }
+
+        return true;
     }
 
-    private void handleRegionDataRequest(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        server.assertPacketType(input.waitForNextPacket(server), TilemanPacketType.END_OF_DATA);
 
-        int regionId = Integer.parseInt(packet.message);
-        Set<TilemanModeTile> tileSet = server.gatherTilesInRegionForUser(connectionProfile.getAccountHashLong(), regionId);
-        List<TilemanModeTile> tiles = new ArrayList<>();
-        for (TilemanModeTile tile : tileSet) {
-            tiles.add(tile);
-        }
-
-        outputQueue.queueData(
-            TilemanPacket.createRegionDataResponse(regionId),
-            tiles,
-            TilemanPacket.createEndOfDataPacket()
-        );
-    }
-
-    private void handleRegionDataResponse(TilemanPacket packet, ObjectInputStreamBufferThread input) throws NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        int regionId = Integer.parseInt(packet.message);
-
-        while (!server.isShutdown()) {
-            Object object = input.waitForNextObject(server);
-            if (object instanceof List) {
-                List<TilemanModeTile> tiles = (List<TilemanModeTile>)object;
-                server.addTileData(connectionProfile.getAccountHashLong(), regionId, tiles);
-            } else {
-                server.assertPacketType((TilemanPacket)object, TilemanPacketType.END_OF_DATA);
-                break;
-            }
-        }
-    }
-
-    private void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+    @Override
+    protected void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
         TilemanModeTile tile = input.waitForNextObject(server);
         server.assertPacketType(input.waitForNextPacket(server), TilemanPacketType.END_OF_DATA);
 
         boolean state = Boolean.parseBoolean(packet.message);
         server.setTile(connectionProfile.getAccountHashLong(), tile, state);
+    }
+
+    private void handleTileSyncRequest() {
+        server.tileDataByPlayer.keySet().stream().forEach(accountHash -> {
+            if (!accountHash.equals(connectionProfile.getAccountHashLong())) {
+                sendRegionHashReport(server.tileDataByPlayer.get(accountHash), accountHash);
+            }
+        });
     }
 }

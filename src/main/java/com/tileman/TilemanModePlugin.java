@@ -616,7 +616,7 @@ public class TilemanModePlugin extends Plugin {
             }
         }
 
-        TilemanMultiplayerService.requestRegionData(requestRegions);
+        //TilemanMultiplayerService.requestRegionData(requestRegions);
         mapRegionsLastSeen = client.getMapRegions();
     }
 }

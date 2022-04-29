@@ -2,15 +2,12 @@ package com.tileman.multiplayer.shared;
 
 import java.io.Serializable;
 
-public class RegionDataHash implements Serializable {
-
+public class PlayerRegionId implements Serializable {
     public final long accountHash;
     public final int regionId;
-    public final int dataHash;
 
-    public RegionDataHash(long accountHash, int regionId, int dataHash) {
+    public PlayerRegionId(long accountHash, int regionId) {
         this.accountHash = accountHash;
         this.regionId = regionId;
-        this.dataHash = dataHash;
     }
 }

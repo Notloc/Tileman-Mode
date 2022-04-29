@@ -4,9 +4,7 @@ import com.tileman.TilemanModePlugin;
 import com.tileman.TilemanProfileManager;
 import com.tileman.shared.TilemanModeTile;
 import com.tileman.multiplayer.client.TilemanClient;
-import com.tileman.multiplayer.client.TilemanClientState;
 import com.tileman.multiplayer.server.TilemanServer;
-import com.tileman.shared.TilemanProfile;
 import net.runelite.api.Client;
 
 import java.util.Collection;
@@ -27,12 +25,9 @@ public class TilemanMultiplayerService {
         return server != null && server.isAlive() && !server.isShutdown();
     }
     public static boolean isConnected() {
-        return serverClient != null && serverClient.isAlive() && serverClient.getClientState() == TilemanClientState.CONNECTED;
+        return serverClient != null && serverClient.isAlive();
     }
 
-    public static boolean isSyncing() {
-        return serverClient != null && serverClient.isAlive() && serverClient.getClientState() == TilemanClientState.SYNCING;
-    }
 
     public static int getServerPort() {
         return server != null ? server.getPortNumber() : -1;
@@ -75,13 +70,7 @@ public class TilemanMultiplayerService {
     }
 
     public static ConcurrentSetMap<Integer, TilemanModeTile> getMultiplayerTileData() {
-        return serverClient.getMultiplayerTileData();
-    }
-
-    public static void requestRegionData(List<Integer> regions) {
-        if (isConnected()) {
-            serverClient.requestRegionData(regions);
-        }
+        return serverClient.getDontUse();
     }
 
     public static void sendMultiplayerTileUpdate(TilemanModeTile tile, boolean state) {
