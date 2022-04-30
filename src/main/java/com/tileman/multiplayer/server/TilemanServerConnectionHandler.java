@@ -1,18 +1,20 @@
 package com.tileman.multiplayer.server;
 
+import com.tileman.GroupTileData;
 import com.tileman.TilemanModeTile;
+import com.tileman.managers.GroupTilemanProfileUtil;
 import com.tileman.multiplayer.*;
 import com.tileman.TilemanProfile;
 
 import java.io.IOException;
 import java.net.Socket;
 
-public class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
+class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
 
     private final TilemanServer server;
     private final Socket connection;
 
-    private final GroupTilemanProfileManager profileManager;
+    private final GroupTilemanProfileUtil profileManager;
 
     private TilemanProfile connectionProfile;
     private ObjectInputStreamBufferThread inputThread;
@@ -143,9 +145,9 @@ public class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
 
     private void handleTileSyncRequest(GroupTileData groupTileData) {
         Long myAccount = connectionProfile.getAccountHashLong();
-        groupTileData.forEachAccount(accountHash -> {
+        groupTileData.forEachProfile(accountHash -> {
             if (!accountHash.equals(myAccount)) {
-                sendRegionHashReport(groupTileData.getAccountData(accountHash), accountHash);
+                sendRegionHashReport(groupTileData.getProfileTileData(accountHash), accountHash);
             }
         });
     }

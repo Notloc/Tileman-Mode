@@ -25,7 +25,8 @@
  */
 package com.tileman.runelite;
 
-import com.tileman.managers.TilemanProfileManager;
+import com.tileman.managers.TilemanGameRulesManager;
+import com.tileman.managers.TilemanProfileUtil;
 import net.runelite.api.Client;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
@@ -66,7 +67,7 @@ public class TileInfoOverlay extends OverlayPanel {
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        if (!plugin.getProfileManager().hasActiveProfile()) {
+        if (!plugin.getTilemanStateManager().hasActiveProfile()) {
             return super.render(graphics);
         }
 
@@ -81,8 +82,8 @@ public class TileInfoOverlay extends OverlayPanel {
                 .rightColor(getTextColor())
                 .build());
 
-        TilemanProfileManager profileManager = plugin.getProfileManager();
-        if(!(profileManager.isEnableCustomGameMode() && !profileManager.isTilesFromExp())) {
+        TilemanGameRulesManager gameRules = plugin.getTilemanStateManager().getGameRulesManager();
+        if(!(gameRules.isEnableCustomGameMode() && !gameRules.isTilesFromExp())) {
             panelComponent.getChildren().add(LineComponent.builder()
                     .left(XP_UNTIL_NEXT_TILE)
                     .right(xpUntilNextTile)

@@ -1,8 +1,8 @@
 package com.tileman.multiplayer.client;
 
+import com.tileman.GroupTileData;
+import com.tileman.managers.TilemanStateManager;
 import com.tileman.multiplayer.*;
-import com.tileman.runelite.TilemanModePlugin;
-import com.tileman.managers.TilemanProfileManager;
 import com.tileman.Util;
 import com.tileman.TilemanModeTile;
 import com.tileman.TilemanProfile;
@@ -13,7 +13,8 @@ import java.net.UnknownHostException;
 
 public class TilemanClient extends TilemanMultiplayerThread {
 
-    private final TilemanModePlugin plugin;
+    private final TilemanStateManager stateManager;
+    private final TilemanProfile profile;
 
     private final String hostname;
     private final int portNumber;
@@ -21,12 +22,13 @@ public class TilemanClient extends TilemanMultiplayerThread {
     ObjectInputStreamBufferThread inputThread;
     Socket socket;
 
-    private TilemanProfile profile;
+
+
     private String password;
 
-    public TilemanClient(TilemanModePlugin plugin, TilemanProfileManager profileManager, String hostname, int portNumber, String password) {
-        this.plugin = plugin;
-        this.profile = profileManager.getActiveProfile();
+    public TilemanClient(TilemanStateManager stateManager, String hostname, int portNumber, String password) {
+        this.stateManager = stateManager;
+        this.profile = stateManager.getActiveProfile();
 
         this.hostname = hostname;
         this.portNumber = portNumber;
@@ -103,7 +105,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
         // Report state of my tiles to server
         long accountHash = profile.getAccountHashLong();
-        sendRegionHashReport(groupTileData.getAccountData(accountHash), accountHash);
+        sendRegionHashReport(groupTileData.getProfileTileData(accountHash), accountHash);
     }
 
     @Override

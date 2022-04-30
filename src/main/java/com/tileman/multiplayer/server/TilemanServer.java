@@ -1,7 +1,7 @@
 package com.tileman.multiplayer.server;
 
 import com.tileman.TilemanModeTile;
-import com.tileman.multiplayer.GroupTilemanProfileManager;
+import com.tileman.managers.GroupTilemanProfileUtil;
 import com.tileman.multiplayer.MpUtil;
 import com.tileman.multiplayer.TilemanMultiplayerService;
 import com.tileman.multiplayer.TilemanPacket;
@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TilemanServer extends Thread {
 
     @Getter
-    private final GroupTilemanProfileManager groupProfileManager;
+    private final GroupTilemanProfileUtil groupProfileManager;
 
     @Getter
     private final int portNumber;
@@ -27,7 +27,7 @@ public class TilemanServer extends Thread {
 
     private boolean isShutdown;
 
-    public TilemanServer(GroupTilemanProfileManager groupProfileManager, int portNumber, String password) {
+    public TilemanServer(GroupTilemanProfileUtil groupProfileManager, int portNumber, String password) {
         this.groupProfileManager = groupProfileManager;
         this.portNumber = portNumber;
         this.hashedPassword = MpUtil.sha512(password);

@@ -8,6 +8,8 @@ import java.time.ZoneOffset;
 import java.util.*;
 
 public class GroupTilemanProfile implements Serializable {
+    public static GroupTilemanProfile NONE = new GroupTilemanProfile("__NONE", -1, "__NONE");
+
     private final String groupName;
     private final String groupCreatorAccountHash;
     private final String multiplayerGroupId;
@@ -18,21 +20,16 @@ public class GroupTilemanProfile implements Serializable {
     public GroupTilemanProfile(String groupName, long accountHash, String accountName) {
         this.groupName = groupName;
         this.groupCreatorAccountHash = String.valueOf(accountHash);
-        this.multiplayerGroupId = groupCreatorAccountHash+ "_" + salt();
+        this.multiplayerGroupId = groupCreatorAccountHash+ "_" + groupName;
         addMember(accountHash, accountName);
-    }
-
-    private String salt() {
-        String seconds = String.valueOf(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC));
-        if (seconds.length() <= 6) {
-            return seconds;
-        } else {
-            return seconds.substring(seconds.length() - 6);
-        }
     }
 
     public String getGroupCreatorAccountHash() {
         return groupCreatorAccountHash;
+    }
+
+    public long getGroupCreatorAccountHashLong() {
+        return Long.parseLong(groupCreatorAccountHash);
     }
 
     public boolean addMember(TilemanProfile profile) {
@@ -68,4 +65,18 @@ public class GroupTilemanProfile implements Serializable {
     }
 
     public String getGroupTilemanProfileKey() { return multiplayerGroupId + "_group"; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof GroupTilemanProfile)) {
+            return false;
+        }
+        GroupTilemanProfile other = (GroupTilemanProfile)o;
+        return multiplayerGroupId.equals(other.multiplayerGroupId);
+    }
+
+    @Override
+    public int hashCode() {
+        return multiplayerGroupId.hashCode();
+    }
 }

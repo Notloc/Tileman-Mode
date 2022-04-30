@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * A thread safe HashMap of Sets.
  */
+//TODO: fix glaring thread safety issues
 public class ConcurrentSetMap<K,V> {
 
     private ConcurrentHashMap<K, Set<V>> internalMap = new ConcurrentHashMap<>();
@@ -50,9 +51,6 @@ public class ConcurrentSetMap<K,V> {
     }
 
     public Set<V> get(K key) {
-        if (internalMap.containsKey(key)) {
-            return internalMap.get(key);
-        }
-        return new HashSet<V>();
+        return internalMap.getOrDefault(key, null);
     }
 }

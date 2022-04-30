@@ -78,17 +78,6 @@ public class TilemanModeOverlay extends Overlay
 			drawTile(graphics, point, color);
 		}
 
-
-		if (TilemanMultiplayerService.isConnected())
-		{
-			ConcurrentSetMap<Integer, TilemanModeTile> multiplayerTileData = TilemanMultiplayerService.getMultiplayerTileData();
-			for (int region : client.getMapRegions())
-			{
-				Collection<TilemanModeTile> tiles = multiplayerTileData.get(region);
-				renderTiles(graphics, tiles, color);
-			}
-		}
-
 		return null;
 	}
 

@@ -1,5 +1,6 @@
 package com.tileman.multiplayer;
 
+import com.tileman.GroupTileData;
 import com.tileman.TilemanModeTile;
 
 import java.util.ArrayList;

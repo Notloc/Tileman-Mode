@@ -1,5 +1,6 @@
 package com.tileman.managers;
 
+import com.tileman.multiplayer.GroupTilemanProfile;
 import com.tileman.runelite.TilemanModeConfig;
 import com.tileman.TilemanGameMode;
 import com.tileman.TilemanGameRules;
@@ -7,60 +8,65 @@ import com.tileman.TilemanProfile;
 
 public class TilemanGameRulesManager {
 
-    private final TilemanProfileManager profileManager;
+    private final TilemanStateManager stateManager;
     private final PersistenceManager persistenceManager;
 
     private TilemanGameRules gameRules = TilemanGameRules.GetDefaultRules();
 
-    public TilemanGameRulesManager(TilemanProfileManager profileManager, PersistenceManager persistenceManager) {
-        this.profileManager = profileManager;
+    public TilemanGameRulesManager(TilemanStateManager profileManager, PersistenceManager persistenceManager) {
+        this.stateManager = profileManager;
         this.persistenceManager = persistenceManager;
     }
 
     public TilemanGameMode getGameMode() { return gameRules.getGameMode(); }
     public void setGameMode(TilemanGameMode mode) {
         gameRules.setGameMode(mode);
-        saveGameRules(profileManager.getActiveProfile(), gameRules);
+        saveGameRules(stateManager.getActiveProfile(), gameRules, persistenceManager);
     }
 
     public boolean isEnableCustomGameMode() { return gameRules.isEnableCustomGameMode(); }
     public void setEnableCustomGameMode(boolean state) {
         gameRules.setEnableCustomGameMode(state);
-        saveGameRules(profileManager.getActiveProfile(), gameRules);
+        saveGameRules(stateManager.getActiveProfile(), gameRules, persistenceManager);
     }
 
     public boolean isAllowTileDeficit() { return gameRules.isAllowTileDeficit(); }
     public void setAllowTileDeficit(boolean state) {
         gameRules.setAllowTileDeficit(state);
-        saveGameRules(profileManager.getActiveProfile(), gameRules);
+        saveGameRules(stateManager.getActiveProfile(), gameRules, persistenceManager);
     }
 
     public boolean isTilesFromTotalLevel() { return gameRules.isTilesFromTotalLevel(); }
     public void setTilesFromTotalLevel(boolean state) {
         gameRules.setTilesFromTotalLevel(state);
-        saveGameRules(profileManager.getActiveProfile(), gameRules);
+        saveGameRules(stateManager.getActiveProfile(), gameRules, persistenceManager);
     }
 
     public boolean isTilesFromExp() { return gameRules.isTilesFromExp(); }
     public void setTilesFromExp(boolean state) {
         gameRules.setTilesFromExp(state);
-        saveGameRules(profileManager.getActiveProfile(), gameRules);
+        saveGameRules(stateManager.getActiveProfile(), gameRules, persistenceManager);
     }
 
     public int getTilesOffset() { return gameRules.getTilesOffset(); }
     public void setTilesOffset(int offset) {
         gameRules.setTilesOffset(offset);
-        saveGameRules(profileManager.getActiveProfile(), gameRules);
+        saveGameRules(stateManager.getActiveProfile(), gameRules, persistenceManager);
     }
 
     public int getExpPerTile() { return gameRules.getExpPerTile(); }
     public void setExpPerTile(int exp) {
         gameRules.setExpPerTile(exp);
-        saveGameRules(profileManager.getActiveProfile(), gameRules);
+        saveGameRules(stateManager.getActiveProfile(), gameRules, persistenceManager);
     }
 
     public void setActiveProfile(TilemanProfile profile) {
         this.gameRules = loadGameRules(profile);
+    }
+
+    public void setActiveGroupProfile(TilemanProfile profile, GroupTilemanProfile groupProfile) {
+        TilemanProfile leaderProfile = TilemanProfileUtil.loadProfile(groupProfile.getGroupCreatorAccountHashLong(), persistenceManager);
+        this.gameRules = loadGameRules(leaderProfile);
     }
 
     private TilemanGameRules loadGameRules(TilemanProfile profile) {
@@ -68,7 +74,7 @@ public class TilemanGameRulesManager {
         return persistenceManager.loadFromJsonOrDefault(TilemanModeConfig.CONFIG_GROUP, rulesKey, TilemanGameRules.class, TilemanGameRules.GetDefaultRules());
     }
 
-    private void saveGameRules(TilemanProfile profile, TilemanGameRules rules) {
+    private static void saveGameRules(TilemanProfile profile, TilemanGameRules rules, PersistenceManager persistenceManager) {
         if (profile.equals(TilemanProfile.NONE)) {
             return;
         }
@@ -76,11 +82,11 @@ public class TilemanGameRulesManager {
         persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, rulesKey, rules);
     }
 
-    public void createGameRulesWithLegacyData(TilemanProfile profile) {
-        saveGameRules(profile, loadGameRulesFromLegacySaveDataOrUseDefaults());
+    public static void createAndSaveGameRulesWithLegacyData(TilemanProfile profile, PersistenceManager persistenceManager) {
+        saveGameRules(profile, loadGameRulesFromLegacySaveDataOrUseDefaults(persistenceManager), persistenceManager);
     }
 
-    private TilemanGameRules loadGameRulesFromLegacySaveDataOrUseDefaults() {
+    private static TilemanGameRules loadGameRulesFromLegacySaveDataOrUseDefaults(PersistenceManager persistenceManager) {
         TilemanGameRules defaults = TilemanGameRules.GetDefaultRules();
         TilemanGameRules rules = new TilemanGameRules();
         rules.setGameMode(persistenceManager.loadOrDefault(TilemanModeConfig.CONFIG_GROUP, "gameMode", TilemanGameMode.class, defaults.getGameMode()));

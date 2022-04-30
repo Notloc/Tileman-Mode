@@ -28,10 +28,11 @@
 package com.tileman.runelite;
 
 import com.google.inject.Provides;
+import com.tileman.ProfileTileData;
 import com.tileman.Util;
 import com.tileman.managers.RunelitePersistenceManager;
 import com.tileman.managers.TilemanGameRulesManager;
-import com.tileman.managers.TilemanProfileManager;
+import com.tileman.managers.TilemanStateManager;
 import com.tileman.multiplayer.TilemanMultiplayerService;
 import com.tileman.TilemanModeTile;
 import lombok.AllArgsConstructor;
@@ -53,7 +54,8 @@ import net.runelite.client.util.ImageUtil;
 
 import javax.inject.Inject;
 import java.util.*;
-import java.util.function.Consumer;
+import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -116,19 +118,16 @@ class TilemanModePlugin extends Plugin {
     private boolean isLoggedIn = false;
 
     @Getter
-    private TilemanProfileManager profileManager;
+    private TilemanStateManager tilemanStateManager;
 
     @Getter
-    private List<WorldPoint> visiblePoints = new ArrayList<>();
+    private Map<Long, List<WorldPoint>> visiblePoints = new HashMap<>();
 
-    public List<Consumer<GameState>> onLoginStateChangedEvent = new ArrayList<>();
+
+    public List<BiConsumer<Boolean, Long>> onLoginStateChangedEvent = new ArrayList<>();
 
     public boolean isShowAdvancedOptions() {
         return config.showAdvancedOptions();
-    }
-
-    public Map<Integer, List<TilemanModeTile>> getTilesByRegion() {
-        return profileManager.getTilesByRegion();
     }
 
     @Subscribe
@@ -148,7 +147,7 @@ class TilemanModePlugin extends Plugin {
     @Subscribe
     public void onMenuEntryAdded(MenuEntryAdded event) {
         final boolean hotKeyPressed = client.isKeyPressed(KeyCode.KC_SHIFT);
-        if (hotKeyPressed && profileManager.hasActiveProfile() && event.getOption().equals(WALK_HERE)) {
+        if (hotKeyPressed && tilemanStateManager.hasActiveProfile() && event.getOption().equals(WALK_HERE)) {
             final Tile selectedSceneTile = client.getSelectedSceneTile();
 
             if (selectedSceneTile == null) {
@@ -157,10 +156,11 @@ class TilemanModePlugin extends Plugin {
 
             final WorldPoint worldPoint = WorldPoint.fromLocalInstance(client, selectedSceneTile.getLocalLocation());
             final int regionId = worldPoint.getRegionID();
-            final TilemanModeTile point = new TilemanModeTile(regionId, worldPoint.getRegionX(), worldPoint.getRegionY(), client.getPlane());
+            final TilemanModeTile tile = new TilemanModeTile(regionId, worldPoint.getRegionX(), worldPoint.getRegionY(), client.getPlane());
 
+            boolean hasTile = tilemanStateManager.getActiveProfileTileData().hasTile(regionId, tile);
             client.createMenuEntry(-1)
-                    .setOption(profileManager.getTilesByRegion().getOrDefault(regionId, new ArrayList()).contains(point) ? UNMARK : MARK)
+                    .setOption(hasTile ? UNMARK : MARK)
                     .setTarget(event.getTarget())
                     .setType(MenuAction.RUNELITE);
         }
@@ -180,7 +180,7 @@ class TilemanModePlugin extends Plugin {
         }
 
         requestMultiplayerTiles();
-        updateVisiblePoints();
+        updateAllVisiblePoints();
         updateTileInfoDisplay();
         inHouse = false;
     }
@@ -189,11 +189,11 @@ class TilemanModePlugin extends Plugin {
         if (gameState == GameState.LOGGED_IN && lastSeenGameState != GameState.LOGGED_IN) {
             isLoggedIn = true;
             lastSeenGameState = GameState.LOGGED_IN;
-            onLoginStateChangedEvent.forEach(func -> func.accept(lastSeenGameState));
+            onLoginStateChangedEvent.forEach(func -> func.accept(isLoggedIn, client.getAccountHash()));
         } else if (gameState == GameState.LOGIN_SCREEN && lastSeenGameState != GameState.LOGIN_SCREEN) {
             isLoggedIn = false;
             lastSeenGameState = GameState.LOGIN_SCREEN;
-            onLoginStateChangedEvent.forEach(func -> func.accept(lastSeenGameState));
+            onLoginStateChangedEvent.forEach(func -> func.accept(isLoggedIn, null));
         }
     }
 
@@ -230,7 +230,14 @@ class TilemanModePlugin extends Plugin {
         tutorialIslandRegionIds.add(12336);
         tutorialIslandRegionIds.add(12592);
 
-        profileManager = new TilemanProfileManager(this, client, new RunelitePersistenceManager(configManager));
+        tilemanStateManager = new TilemanStateManager(new RunelitePersistenceManager(configManager));
+        onLoginStateChangedEvent.add((isLoggedIn, accountHash) -> {
+           if (isLoggedIn) {
+               tilemanStateManager.onLoggedIn(accountHash);
+           } else {
+               tilemanStateManager.onLoggedOut();
+           }
+        });
 
         overlayManager.add(overlay);
         overlayManager.add(minimapOverlay);
@@ -240,7 +247,7 @@ class TilemanModePlugin extends Plugin {
         updateTileInfoDisplay();
         log.debug("startup");
 
-        TilemanPluginPanel panel = new TilemanPluginPanel(this, client, profileManager);
+        TilemanPluginPanel panel = new TilemanPluginPanel(this, client, tilemanStateManager);
 
         NavigationButton navButton = NavigationButton.builder()
                 .tooltip("Tileman Mode")
@@ -250,10 +257,10 @@ class TilemanModePlugin extends Plugin {
                 .build();
 
         TilemanMultiplayerService.onMultiplayerStateChanged.add(() -> panel.rebuild());
-        profileManager.onProfileChangedEvent.add(p -> {
+        tilemanStateManager.onProfileChangedEvent.add((localProfile, groupProfile) -> {
             panel.rebuild();
             updateTileInfoDisplay();
-            updateVisiblePoints();
+            updateAllVisiblePoints();
         });
         clientToolbar.addNavigation(navButton);
     }
@@ -267,17 +274,36 @@ class TilemanModePlugin extends Plugin {
         overlayManager.remove(infoOverlay);
     }
 
-    private void updateVisiblePoints() {
+    private void updateAllVisiblePoints() {
         visiblePoints.clear();
+        if (tilemanStateManager.getActiveGroupTileData() != null) {
+            tilemanStateManager.getActiveGroupProfile().getGroupMemberAccountHashes().forEach(accountHashString -> {
+                updateVisiblePointsForAccountHash(Long.parseLong(accountHashString));
+            });
+        } else if (tilemanStateManager.getActiveProfileTileData() != null) {
+            updateVisiblePointsForAccountHash(tilemanStateManager.getActiveProfile().getAccountHashLong());
+        }
+    }
+
+    private void updateVisiblePointsForAccountHash(long accountHash) {
+        visiblePoints.remove(accountHash);
+
+        ProfileTileData tileData = tilemanStateManager.getProfileDataForProfile(accountHash);
+        if (tileData == null) {
+            return;
+        }
+
+        List<WorldPoint> points = new ArrayList<>();
 
         int[] regionIds = client.getMapRegions();
-        for (int region : regionIds) {
-            List<TilemanModeTile> tiles = profileManager.getTilesByRegion().get(region);
+        for (int regionId : regionIds) {
+            Set<TilemanModeTile> tiles = tileData.getRegion(regionId);
             if (tiles == null) {
                 continue;
             }
-            Util.translateTilesToWorldPoints(client, tiles, visiblePoints);
+            Util.translateTilesToWorldPoints(client, tiles, points);
         }
+        visiblePoints.put(accountHash, points);
     }
 
     private void autoMark() {
@@ -311,16 +337,8 @@ class TilemanModePlugin extends Plugin {
     }
 
     private void updateTileInfoDisplay() {
-        int totalTiles = 0;
-        Map<Integer, List<TilemanModeTile>> tilesByRegion = profileManager.getTilesByRegion();
-
-        for (Integer region : tilesByRegion.keySet()) {
-            List<TilemanModeTile> regionTiles = tilesByRegion.get(region);
-            totalTiles += regionTiles.size();
-        }
-
+        int totalTiles = tilemanStateManager.countUnlockedTiles();
         log.debug("Updating tile counter");
-
         updateTotalTilesUsed(totalTiles);
         updateRemainingTiles(totalTiles);
         updateXpUntilNextTile();
@@ -331,7 +349,7 @@ class TilemanModePlugin extends Plugin {
     }
 
     private void updateRemainingTiles(int placedTiles) {
-        TilemanGameRulesManager gameRules = profileManager.getGameRulesManager();
+        TilemanGameRulesManager gameRules = tilemanStateManager.getGameRulesManager();
         // Start with tiles offset. We always get these
         int earnedTiles = gameRules.getTilesOffset();
 
@@ -349,7 +367,7 @@ class TilemanModePlugin extends Plugin {
     }
 
     private void updateXpUntilNextTile() {
-        TilemanGameRulesManager gameRules = profileManager.getGameRulesManager();
+        TilemanGameRulesManager gameRules = tilemanStateManager.getGameRulesManager();
         xpUntilNextTile = gameRules.getExpPerTile() - Integer.parseInt(Long.toString(client.getOverallExperience() % gameRules.getExpPerTile()));
     }
 
@@ -533,36 +551,11 @@ class TilemanModePlugin extends Plugin {
         if(Util.containsAnyOf(getTileMovementFlags(localPoint), fullBlock)) {
             return;
         }
-
         WorldPoint worldPoint = WorldPoint.fromLocalInstance(client, localPoint);
-
         int regionId = worldPoint.getRegionID();
         TilemanModeTile tile = new TilemanModeTile(regionId, worldPoint.getRegionX(), worldPoint.getRegionY(), client.getPlane());
-        log.debug("Updating point: {} - {}", tile, worldPoint);
 
-        Map<Integer, List<TilemanModeTile>> tilesByRegion = profileManager.getTilesByRegion();
-
-        List<TilemanModeTile> tilemanModeTiles = tilesByRegion.get(regionId);
-        if (tilemanModeTiles == null) {
-            tilemanModeTiles = new ArrayList<TilemanModeTile>();
-            tilesByRegion.put(regionId, tilemanModeTiles);
-        }
-
-        if (markedValue) {
-            // Try add tile
-            if (!tilemanModeTiles.contains(tile) && (profileManager.getGameRulesManager().isAllowTileDeficit() || remainingTiles > 0)) {
-                tilemanModeTiles.add(tile);
-                visiblePoints.add(worldPoint);
-            }
-        } else {
-            // Try remove tile
-            tilemanModeTiles.remove(tile);
-            visiblePoints.remove(worldPoint);
-
-        }
-
-        TilemanMultiplayerService.sendMultiplayerTileUpdate(tile, markedValue);
-        profileManager.saveTiles(profileManager.getActiveProfile(), regionId, tilemanModeTiles);
+        tilemanStateManager.updateTileMark(regionId, tile, markedValue);
     }
 
     int getXpUntilNextTile() {

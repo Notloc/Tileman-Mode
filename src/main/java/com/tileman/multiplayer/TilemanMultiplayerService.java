@@ -1,8 +1,9 @@
 package com.tileman.multiplayer;
 
+import com.tileman.managers.GroupTilemanProfileUtil;
 import com.tileman.managers.RunelitePersistenceManager;
 import com.tileman.runelite.TilemanModePlugin;
-import com.tileman.managers.TilemanProfileManager;
+import com.tileman.managers.TilemanProfileUtil;
 import com.tileman.TilemanModeTile;
 import com.tileman.multiplayer.client.TilemanClient;
 import com.tileman.multiplayer.server.TilemanServer;
@@ -39,7 +40,7 @@ public class TilemanMultiplayerService {
             return;
         }
 
-        GroupTilemanProfileManager groupProfileManager = new GroupTilemanProfileManager(new RunelitePersistenceManager(configManager), groupTilemanProfile);
+        GroupTilemanProfileUtil groupProfileManager = new GroupTilemanProfileUtil(new RunelitePersistenceManager(configManager), groupTilemanProfile);
         server = new TilemanServer(groupProfileManager, port, password);
         server.start();
     }
@@ -51,7 +52,7 @@ public class TilemanMultiplayerService {
         invokeMultiplayerStateChanged();
     }
 
-    public static void connect(Client client, TilemanModePlugin plugin, TilemanProfileManager profileManager, String hostname, int port, String password) {
+    public static void connect(Client client, TilemanModePlugin plugin, TilemanProfileUtil profileManager, String hostname, int port, String password) {
         if (serverClient != null && serverClient.isAlive()) {
             return;
         }
