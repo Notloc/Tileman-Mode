@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022, Colton Campbell <https://github.com/Notloc>
+ * Copyright (c) 2018, TheLonelyDev <https://github.com/TheLonelyDev>
+ * Copyright (c) 2018, Adam <Adam@sigterm.info>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,24 +25,17 @@
  */
 package com.tileman;
 
+import lombok.Value;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
-public class TilemanProfileExportData implements Serializable {
-
-    public TilemanProfile profile;
-    public ArrayList<Integer> regionIds;
-    public ArrayList<List<TilemanModeTile>> regionTiles;
-
-    public TilemanProfileExportData(TilemanProfile profile, Map<Integer, List<TilemanModeTile>> tileDataByRegion) {
-        this.profile = profile;
-        this.regionIds = new ArrayList<>();
-        this.regionTiles = new ArrayList<>();
-        for (Integer regionId : tileDataByRegion.keySet()) {
-            regionIds.add(regionId);
-            regionTiles.add(tileDataByRegion.get(regionId));
-        }
-    }
+/**
+ * Used for serialization of ground marker points.
+ */
+@Value
+public class TilemanModeTile implements Serializable
+{
+	private int regionId;
+	private int regionX;
+	private int regionY;
+	private int z;
 }

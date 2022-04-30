@@ -1,7 +1,10 @@
 package com.tileman.multiplayer.server;
 
-import com.tileman.shared.TilemanModeTile;
-import com.tileman.multiplayer.shared.*;
+import com.tileman.TilemanModeTile;
+import com.tileman.multiplayer.GroupTilemanProfileManager;
+import com.tileman.multiplayer.MpUtil;
+import com.tileman.multiplayer.TilemanMultiplayerService;
+import com.tileman.multiplayer.TilemanPacket;
 import lombok.Getter;
 
 import java.io.*;
@@ -10,24 +13,22 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class TilemanServer extends Thread implements IShutdown {
+public class TilemanServer extends Thread {
 
     @Getter
-    private final GroupTilemanProfileManager profileManager;
+    private final GroupTilemanProfileManager groupProfileManager;
 
     @Getter
     private final int portNumber;
     private ServerSocket serverSocket;
     private final String hashedPassword;
 
-    @Getter
-    private GroupTileData groupTileData;
     private final Set<TilemanServerConnectionHandler> activeConnections = ConcurrentHashMap.newKeySet();
 
     private boolean isShutdown;
 
-    public TilemanServer(GroupTilemanProfileManager profileManager, int portNumber, String password) {
-        this.profileManager = profileManager;
+    public TilemanServer(GroupTilemanProfileManager groupProfileManager, int portNumber, String password) {
+        this.groupProfileManager = groupProfileManager;
         this.portNumber = portNumber;
         this.hashedPassword = MpUtil.sha512(password);
     }
@@ -106,7 +107,6 @@ public class TilemanServer extends Thread implements IShutdown {
         return this.hashedPassword.equals(hashedPassword);
     }
 
-    @Override
     public boolean isShutdown() {
         return isShutdown;
     }

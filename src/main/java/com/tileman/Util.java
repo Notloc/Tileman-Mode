@@ -1,6 +1,5 @@
 package com.tileman;
 
-import com.tileman.shared.TilemanModeTile;
 import net.runelite.api.Client;
 import net.runelite.api.coords.WorldPoint;
 

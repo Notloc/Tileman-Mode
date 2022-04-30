@@ -1,8 +1,8 @@
 package com.tileman.multiplayer.server;
 
-import com.tileman.shared.TilemanModeTile;
-import com.tileman.multiplayer.shared.*;
-import com.tileman.shared.TilemanProfile;
+import com.tileman.TilemanModeTile;
+import com.tileman.multiplayer.*;
+import com.tileman.TilemanProfile;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -20,7 +20,7 @@ public class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
     public TilemanServerConnectionHandler(TilemanServer server, Socket connection) throws IOException {
         this.server = server;
         this.connection = connection;
-        this.profileManager = server.getProfileManager();
+        this.profileManager = server.getGroupProfileManager();
         this.outputQueue = new ConcurrentOutputQueue<>(connection.getOutputStream());
     }
 

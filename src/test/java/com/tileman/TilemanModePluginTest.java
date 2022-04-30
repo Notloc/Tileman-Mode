@@ -1,5 +1,6 @@
 package com.tileman;
 
+import com.tileman.runelite.TilemanModePlugin;
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 

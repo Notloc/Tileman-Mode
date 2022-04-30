@@ -1,12 +1,11 @@
 package com.tileman.multiplayer.client;
 
-import com.tileman.TilemanModePlugin;
-import com.tileman.TilemanProfileManager;
+import com.tileman.multiplayer.*;
+import com.tileman.runelite.TilemanModePlugin;
+import com.tileman.managers.TilemanProfileManager;
 import com.tileman.Util;
-import com.tileman.shared.TilemanModeTile;
-import com.tileman.multiplayer.shared.*;
-import com.tileman.shared.TilemanProfile;
-import net.runelite.api.Client;
+import com.tileman.TilemanModeTile;
+import com.tileman.TilemanProfile;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -119,7 +118,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
     }
 
     @Override
-    protected void onUpdate() throws NetworkShutdownException, NetworkTimeoutException{
+    protected void onUpdate() throws NetworkShutdownException, NetworkTimeoutException {
         try {
             outputQueue.flush();
 
