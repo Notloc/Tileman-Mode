@@ -65,18 +65,17 @@ class TilemanModeMinimapOverlay extends Overlay
 			return null;
 		}
 
-		Color color = getTileColor();
-		List<WorldPoint> visibleTilePoints = plugin.getVisiblePoints();
-
-		for (final WorldPoint point : visibleTilePoints)
-		{
-			if (point.getPlane() != client.getPlane())
+		plugin.getVisiblePoints().forEach((accountHash, worldPoints) -> {
+			Color color = getTileColor();
+			for (final WorldPoint point : worldPoints)
 			{
-				continue;
+				if (point.getPlane() != client.getPlane())
+				{
+					continue;
+				}
+				drawOnMinimap(graphics, point, color);
 			}
-			drawOnMinimap(graphics, point, color);
-		}
-
+		});
 		return null;
 	}
 

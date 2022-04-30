@@ -1,12 +1,13 @@
 package com.tileman;
 
-import java.util.Arrays;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
 
 public class GroupTileData {
-    protected ConcurrentHashMap<Long, ProfileTileData> tileDataByAccount = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Long, ProfileTileData> tileDataByAccount = new ConcurrentHashMap<>();
+    private ConcurrentLinkedQueue<ProfileTileData> allProfileTileData = new ConcurrentLinkedQueue<>();
 
     public void forEachProfile(BiConsumer<Long, ProfileTileData> consumer) {
         tileDataByAccount.keySet().forEach(accountHash -> {
@@ -16,6 +17,7 @@ public class GroupTileData {
 
     public void insertProfileTileData(Long accountHash, ProfileTileData profileTileData) {
         tileDataByAccount.put(accountHash, profileTileData);
+        allProfileTileData.add(profileTileData);
     }
 
     public Set<TilemanModeTile> getRegion(long accountHash, int regionId) {
@@ -61,6 +63,10 @@ public class GroupTileData {
         } else {
             tileDataByAccount.get(accountHash).removeTile(tile.getRegionId(), tile);
         }
+    }
+
+    public Collection<ProfileTileData> getAllProfileTileData() {
+        return allProfileTileData;
     }
 
     public int countTiles() {

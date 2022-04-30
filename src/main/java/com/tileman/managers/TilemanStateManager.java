@@ -9,6 +9,7 @@ import com.tileman.multiplayer.TilemanMultiplayerService;
 import lombok.Getter;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -102,6 +103,16 @@ public class TilemanStateManager {
             return activeProfileTileData;
         }
         return null;
+    }
+
+    public Collection<ProfileTileData> getAllActiveProfileTileData() {
+        if (activeProfile.isGroupTileman()) {
+            return activeGroupTileData.getAllProfileTileData();
+        } else {
+            List<ProfileTileData> list = new ArrayList<>();
+            list.add(activeProfileTileData);
+            return list;
+        }
     }
 
     public int countUnlockedTiles() {
