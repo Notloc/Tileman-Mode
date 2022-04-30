@@ -1,11 +1,13 @@
 package com.tileman.multiplayer.shared;
 
+import com.tileman.RuneliteDataManager;
 import com.tileman.TilemanModePlugin;
 import com.tileman.TilemanProfileManager;
 import com.tileman.shared.TilemanModeTile;
 import com.tileman.multiplayer.client.TilemanClient;
 import com.tileman.multiplayer.server.TilemanServer;
 import net.runelite.api.Client;
+import net.runelite.client.config.ConfigManager;
 
 import java.util.Collection;
 import java.util.List;
@@ -33,14 +35,14 @@ public class TilemanMultiplayerService {
         return server != null ? server.getPortNumber() : -1;
     }
 
-    public static void startServer(Client client, TilemanModePlugin plugin, TilemanProfileManager profileManager, int port, String password) {
+    public static void startServer(GroupTilemanProfile groupTilemanProfile, String password, ConfigManager configManager, int port) {
         if (server != null && server.isAlive()) {
             return;
         }
-        server = new TilemanServer(port, "");
-        server.start();
 
-        connect(client, plugin, profileManager, "localhost", port, password);
+        GroupTilemanProfileManager groupProfileManager = new GroupTilemanProfileManager(new RuneliteDataManager(configManager), groupTilemanProfile);
+        server = new TilemanServer(groupProfileManager, port, password);
+        server.start();
     }
 
     public static void stopServer() {
@@ -67,10 +69,6 @@ public class TilemanMultiplayerService {
         for (Runnable runnable : onMultiplayerStateChanged) {
             runnable.run();
         }
-    }
-
-    public static ConcurrentSetMap<Integer, TilemanModeTile> getMultiplayerTileData() {
-        return serverClient.getDontUse();
     }
 
     public static void sendMultiplayerTileUpdate(TilemanModeTile tile, boolean state) {

@@ -10,25 +10,24 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class TilemanServer extends TilemanMultiplayerThread {
+public class TilemanServer extends Thread implements IShutdown {
+
+    @Getter
+    private final GroupTilemanProfileManager profileManager;
 
     @Getter
     private final int portNumber;
     private ServerSocket serverSocket;
-    private String hashedPassword;
+    private final String hashedPassword;
 
-    @Deprecated
-    @Getter private GroupTilemanProfile multiplayerGroup;
+    @Getter
+    private GroupTileData groupTileData;
+    private final Set<TilemanServerConnectionHandler> activeConnections = ConcurrentHashMap.newKeySet();
 
-    // Data structure gore, I'm sorry.
-    // It's a thread safe map, keyed by account hash, of each user's tile data. Tile data is mapped by region and stored in hashsets.
-    ConcurrentHashMap<Long, ConcurrentSetMap<Integer, TilemanModeTile>> tileDataByPlayer = new ConcurrentHashMap<>();
+    private boolean isShutdown;
 
-    ConcurrentHashMap<Socket, ConcurrentOutputQueue<Object>> outputQueueBySocket = new ConcurrentHashMap<>();
-
-    private final Set<Socket> activeConnections = ConcurrentHashMap.newKeySet();
-
-    public TilemanServer(int portNumber, String password) {
+    public TilemanServer(GroupTilemanProfileManager profileManager, int portNumber, String password) {
+        this.profileManager = profileManager;
         this.portNumber = portNumber;
         this.hashedPassword = MpUtil.sha512(password);
     }
@@ -48,7 +47,7 @@ public class TilemanServer extends TilemanMultiplayerThread {
     }
 
     public void shutdown() {
-        isShuttingDown = true;
+        isShutdown = true;
         try {
             serverSocket.close();
         } catch (IOException e) {
@@ -72,68 +71,28 @@ public class TilemanServer extends TilemanMultiplayerThread {
         try {
             TilemanServerConnectionHandler connectionHandler = new TilemanServerConnectionHandler(this, connection);
             connectionHandler.start();
+            activeConnections.add(connectionHandler);
         } catch (IOException e) {}
     }
 
-    void addConnection(Socket connection, ConcurrentOutputQueue<Object> outputQueue) {
-        activeConnections.add(connection);
-        outputQueueBySocket.put(connection, outputQueue);
-    }
-
-    void removeConnection(Socket connection) {
-        activeConnections.remove(connection);
-        outputQueueBySocket.remove(connection);
-    }
-
-    Set<TilemanModeTile> gatherTilesInRegionForUser(long userId, int regionId) {
-        Set<TilemanModeTile> gatheredRegionData = new HashSet<>();
-
-        for (long id : tileDataByPlayer.keySet()) {
-            if (id == userId) {
-                continue; // Skip sending a user their own tiles
-            }
-            Set<TilemanModeTile> regionData = tileDataByPlayer.get(id).get(regionId);
-            gatheredRegionData.addAll(regionData);
-        }
-        return gatheredRegionData;
-    }
-
-    void addTileData(long playerId, int regionId, List<TilemanModeTile> tiles) {
-        ensurePlayerEntry(playerId);
-        tileDataByPlayer.get(playerId).addAll(regionId, tiles);
-    }
-
-    void setTile(long sender, TilemanModeTile tile, boolean state) {
-        ensurePlayerEntry(sender);
-
-        if (state) {
-            tileDataByPlayer.get(sender).add(tile.getRegionId(), tile);
-        } else {
-            tileDataByPlayer.get(sender).remove(tile.getRegionId(), tile);
-        }
+    void forwardTileUpdate(long sender, TilemanModeTile tile, boolean state) {
         // Send the update to all connected players
         queueOutputForAllConnections(
                 TilemanPacket.createTileUpdatePacket(state),
+                sender,
                 tile,
                 TilemanPacket.createEndOfDataPacket()
         );
     }
 
-    private void ensurePlayerEntry(long playerId) {
-        if (!tileDataByPlayer.containsKey(playerId)) {
-            tileDataByPlayer.put(playerId, new ConcurrentSetMap<>());
-        }
-    }
-
     void queueOutputForAllConnections(Object... objects) {
-        for (Socket connection : activeConnections) {
+        for (TilemanServerConnectionHandler connection : activeConnections) {
             queueOutputForConnection(connection, objects);
         }
     }
 
-    private void queueOutputForConnection(Socket connection, Object... data) {
-        ConcurrentOutputQueue<Object> outputQueue = outputQueueBySocket.get(connection);
-        outputQueue.queueData(data);
+    private void queueOutputForConnection(TilemanServerConnectionHandler connection, Object... data) {
+        connection.queueData(data);
     }
 
     public boolean isRequiresPassword() {
@@ -145,5 +104,10 @@ public class TilemanServer extends TilemanMultiplayerThread {
             return true;
         }
         return this.hashedPassword.equals(hashedPassword);
+    }
+
+    @Override
+    public boolean isShutdown() {
+        return isShutdown;
     }
 }

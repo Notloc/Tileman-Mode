@@ -6,25 +6,18 @@ import com.tileman.Util;
 import com.tileman.shared.TilemanModeTile;
 import com.tileman.multiplayer.shared.*;
 import com.tileman.shared.TilemanProfile;
-import lombok.Getter;
 import net.runelite.api.Client;
 
 import java.io.IOException;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class TilemanClient extends TilemanMultiplayerThread {
 
-    private final Client client;
     private final TilemanModePlugin plugin;
 
     private final String hostname;
     private final int portNumber;
-
-    @Getter
-    private final ConcurrentSetMap<Integer, TilemanModeTile> dontUse = new ConcurrentSetMap<>();
 
     ObjectInputStreamBufferThread inputThread;
     Socket socket;
@@ -32,8 +25,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
     private TilemanProfile profile;
     private String password;
 
-    public TilemanClient(Client client, TilemanModePlugin plugin, TilemanProfileManager profileManager, String hostname, int portNumber, String password) {
-        this.client = client;
+    public TilemanClient(TilemanModePlugin plugin, TilemanProfileManager profileManager, String hostname, int portNumber, String password) {
         this.plugin = plugin;
         this.profile = profileManager.getActiveProfile();
 
@@ -61,7 +53,9 @@ public class TilemanClient extends TilemanMultiplayerThread {
                 return false;
             }
 
-            requestTileSync();
+            // Handle joining group case
+
+            requestTileSync(groupTileData);
             return true;
 
         } catch (UnknownHostException unknownHostException) {
@@ -101,7 +95,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
         return false;
     }
 
-    private void requestTileSync() throws IOException {
+    private void requestTileSync(GroupTileData groupTileData) throws IOException {
         // Ask for tiles from server
         outputQueue.queueData(
                 TilemanPacket.createTileSyncRequest(),
@@ -110,7 +104,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
         // Report state of my tiles to server
         long accountHash = profile.getAccountHashLong();
-        sendRegionHashReport(tileDataByPlayer.get(accountHash), accountHash);
+        sendRegionHashReport(groupTileData.getAccountData(accountHash), accountHash);
     }
 
     @Override
@@ -131,28 +125,26 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
             TilemanPacket packet = inputThread.tryGetNextPacket();
             if (packet != null) {
-                handlePacket(packet, inputThread);
+                handlePacket(groupTileData, packet, inputThread);
             }
         } catch (UnexpectedPacketTypeException unexpectedPacketTypeException) {
             unexpectedPacketTypeException.printStackTrace();
         } catch (IOException ioException) {
             ioException.printStackTrace();
-        } catch (ClassNotFoundException classNotFoundException) {
-            classNotFoundException.printStackTrace();
         } catch (InterruptedException interruptedException) {
             interruptedException.printStackTrace();
         }
     }
 
     @Override
-    protected boolean handlePacket(TilemanPacket packet, ObjectInputStreamBufferThread input) throws IOException, ClassNotFoundException, InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        if (super.handlePacket(packet, input)) {
+    protected boolean handlePacket(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        if (super.handlePacket(groupTileData, packet, input)) {
             return true;
         }
 
         switch (packet.packetType) {
             default:
-                //throw new IOException("Unexpected packet type in client: " + packet.packetType);
+                //throw new UnexpectedPacketTypeException("Unexpected packet type in client: " + packet.packetType);
         }
 
         return true;
@@ -167,19 +159,13 @@ public class TilemanClient extends TilemanMultiplayerThread {
     }
 
     @Override
-    protected void handleTileUpdate(TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        Object object = input.waitForNextObject(this);
-        TilemanModeTile tile = (TilemanModeTile)object;
+    protected void handleTileUpdate(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        boolean tileState = Boolean.parseBoolean(packet.message);
+        long accountHash = input.waitForNextObject(this);
+        TilemanModeTile tile = input.waitForNextObject(this);
         assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
 
-        if (dontUse.containsKey(tile.getRegionId())) {
-            boolean tileState = Boolean.parseBoolean(packet.message);
-            if (tileState) {
-                dontUse.add(tile.getRegionId(), tile);
-            } else {
-                dontUse.remove(tile.getRegionId(), tile);
-            }
-        }
+        groupTileData.setTile(accountHash, tile, tileState);
     }
 
     public void disconnect() {
