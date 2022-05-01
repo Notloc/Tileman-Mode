@@ -276,7 +276,7 @@ class TilemanModePlugin extends Plugin {
 
     private void updateAllVisiblePoints() {
         visiblePoints.clear();
-        if (tilemanStateManager.getActiveGroupTileData() != null) {
+        if (tilemanStateManager.getActiveProfile().isGroupTileman()) {
             tilemanStateManager.getActiveGroupProfile().getGroupMemberAccountHashes().forEach(accountHashString -> {
                 updateVisiblePointsForAccountHash(Long.parseLong(accountHashString));
             });

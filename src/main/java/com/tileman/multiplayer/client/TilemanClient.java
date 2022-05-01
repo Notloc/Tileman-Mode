@@ -15,6 +15,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
     private final TilemanStateManager stateManager;
     private final TilemanProfile profile;
+    private /*final*/ GroupTilemanProfile groupProfile;
 
     private final String hostname;
     private final int portNumber;
@@ -54,9 +55,12 @@ public class TilemanClient extends TilemanMultiplayerThread {
                 return false;
             }
 
-            // Handle joining group case
+            syncGroupProfile();
+            if (this.groupProfile.equals(GroupTilemanProfile.NONE)) {
+                return false;
+            }
 
-            requestTileSync(groupTileData);
+            requestTileSync(groupProfile.getGroupTileData());
             return true;
 
         } catch (UnknownHostException unknownHostException) {
@@ -65,7 +69,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
             unexpectedPacketTypeException.printStackTrace();
         } catch (IOException ioException) {
             ioException.printStackTrace();
-        } catch (InterruptedException interruptedException) {
+        } catch (InterruptedException | NetworkShutdownException | NetworkTimeoutException interruptedException) {
             interruptedException.printStackTrace();
         }
 
@@ -84,16 +88,24 @@ public class TilemanClient extends TilemanMultiplayerThread {
         outputQueue.flush();
     }
 
-    private boolean awaitAuthenticationResponse(ObjectInputStreamBufferThread inputThread) throws InterruptedException, UnexpectedPacketTypeException {
-        while (!isShutdown()) {
-            TilemanPacket packet = inputThread.tryGetNextPacket();
-            if (packet != null) {
-                assertPacketType(packet, TilemanPacketType.AUTHENTICATION_RESPONSE);
-                return Boolean.parseBoolean(packet.message);
-            }
-            sleep(100);
+    private boolean awaitAuthenticationResponse(ObjectInputStreamBufferThread inputThread) throws InterruptedException, UnexpectedPacketTypeException, NetworkShutdownException, NetworkTimeoutException {
+        TilemanPacket packet = inputThread.waitForNextPacket(this);
+        assertPacketType(packet, TilemanPacketType.AUTHENTICATION_RESPONSE);
+        assertPacketType(inputThread.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+        return Boolean.parseBoolean(packet.message);
+    }
+
+    // Get the latest group profile data from the server. In certain cases the leader will be uploading a newer version to the server/others.
+    private void syncGroupProfile() throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
+        if (!profile.isGroupTileman()) {
+            requestGroupProfile();
+        } else {
+            sendGroupProfile(stateManager.getActiveGroupProfile());
         }
-        return false;
+
+        GroupTilemanProfile groupProfile = handleGroupProfileResponse(inputThread);
+        stateManager.assignGroupProfile(profile, groupProfile);
+        this.groupProfile = groupProfile;
     }
 
     private void requestTileSync(GroupTileData groupTileData) throws IOException {
@@ -126,7 +138,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
             TilemanPacket packet = inputThread.tryGetNextPacket();
             if (packet != null) {
-                handlePacket(groupTileData, packet, inputThread);
+                handlePacket(groupProfile, packet, inputThread);
             }
         } catch (UnexpectedPacketTypeException unexpectedPacketTypeException) {
             unexpectedPacketTypeException.printStackTrace();
@@ -138,15 +150,15 @@ public class TilemanClient extends TilemanMultiplayerThread {
     }
 
     @Override
-    protected boolean handlePacket(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        if (super.handlePacket(groupTileData, packet, input)) {
+    protected boolean handlePacket(GroupTilemanProfile groupProfile, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        if (super.handlePacket(groupProfile, packet, input)) {
             return true;
         }
 
-        switch (packet.packetType) {
-            default:
+        //switch (packet.packetType) {
+        //    default:
                 //throw new UnexpectedPacketTypeException("Unexpected packet type in client: " + packet.packetType);
-        }
+        //}
 
         return true;
     }

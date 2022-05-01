@@ -2,7 +2,7 @@ package com.tileman.multiplayer;
 
 import com.tileman.managers.GroupTilemanProfileUtil;
 import com.tileman.managers.RunelitePersistenceManager;
-import com.tileman.runelite.TilemanModePlugin;
+import com.tileman.managers.TilemanStateManager;
 import com.tileman.managers.TilemanProfileUtil;
 import com.tileman.TilemanModeTile;
 import com.tileman.multiplayer.client.TilemanClient;
@@ -35,13 +35,16 @@ public class TilemanMultiplayerService {
         return server != null ? server.getPortNumber() : -1;
     }
 
-    public static void startServer(GroupTilemanProfile groupTilemanProfile, String password, ConfigManager configManager, int port) {
+    public static void startServer(TilemanStateManager stateManager, RunelitePersistenceManager persistenceManager, String password, int port) {
         if (server != null && server.isAlive()) {
             return;
         }
 
-        GroupTilemanProfileUtil groupProfileManager = new GroupTilemanProfileUtil(new RunelitePersistenceManager(configManager), groupTilemanProfile);
-        server = new TilemanServer(groupProfileManager, port, password);
+        if (!stateManager.getActiveProfile().isGroupTileman()) {
+            return;
+        }
+
+        server = new TilemanServer(stateManager.getActiveGroupProfile(), persistenceManager, port, password);
         server.start();
     }
 
@@ -52,12 +55,12 @@ public class TilemanMultiplayerService {
         invokeMultiplayerStateChanged();
     }
 
-    public static void connect(Client client, TilemanModePlugin plugin, TilemanProfileUtil profileManager, String hostname, int port, String password) {
+    public static void connect(TilemanStateManager stateManager, String hostname, int port, String password) {
         if (serverClient != null && serverClient.isAlive()) {
             return;
         }
 
-        serverClient = new TilemanClient(client, plugin, profileManager, hostname, port, password);
+        serverClient = new TilemanClient(stateManager, hostname, port, password);
         serverClient.start();
     }
 

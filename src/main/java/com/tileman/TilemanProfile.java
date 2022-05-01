@@ -24,26 +24,30 @@
  */
 package com.tileman;
 
+import com.tileman.multiplayer.GroupTilemanProfile;
 import lombok.Getter;
+import lombok.Setter;
 
+import java.beans.Transient;
 import java.io.Serializable;
 
 public class TilemanProfile implements Serializable {
-
     public static final TilemanProfile NONE = new TilemanProfile(-1, "None");
 
     @Getter private final String accountHash;
     @Getter private final String profileName;
-
     private String multiplayerGroupId;
+
+    @Getter @Setter
+    private transient ProfileTileData tileData;
 
     public TilemanProfile(long accountHash, String profileName) {
         this.accountHash = String.valueOf(accountHash);
         this.profileName = profileName;
     }
 
-    public void joinMultiplayerGroup(String multiplayerGroupId) {
-        this.multiplayerGroupId = multiplayerGroupId;
+    public void joinMultiplayerGroup(GroupTilemanProfile groupProfile) {
+        this.multiplayerGroupId = groupProfile.getMultiplayerGroupId();
     }
 
     public void leaveMultiplayerGroup() {

@@ -25,6 +25,11 @@ public final class ProfileTileDataUtil {
         });
     }
 
+    public static void saveRegion(long accountHash, int regionId, Set<TilemanModeTile> tiles, PersistenceManager persistenceManager) {
+        TilemanProfile profile = new TilemanProfile(accountHash, "TEMP");
+        saveRegion(profile, regionId, tiles, persistenceManager);
+    }
+
     public static void saveRegion(TilemanProfile profile, int regionId, Set<TilemanModeTile> tiles, PersistenceManager persistenceManager) {
         if (profile.equals(TilemanProfile.NONE)) {
             return;
@@ -40,7 +45,7 @@ public final class ProfileTileDataUtil {
     }
 
     public static ProfileTileData loadProfileTileData(TilemanProfile profile, PersistenceManager persistenceManager) {
-        ProfileTileData profileTileData = new ProfileTileData(profile);
+        ProfileTileData profileTileData = new ProfileTileData();
 
         List<String> regionStrings = persistenceManager.findFullKeysByPrefix(TilemanModeConfig.CONFIG_GROUP + "." + profile.getRegionPrefix());
         regionStrings = removeKeyPrefixes(regionStrings, TilemanModeConfig.CONFIG_GROUP, profile.getRegionPrefix());
@@ -90,7 +95,7 @@ public final class ProfileTileDataUtil {
         }
 
         // Convert
-        ProfileTileData profileTileData = new ProfileTileData(profile.getAccountHashLong());
+        ProfileTileData profileTileData = new ProfileTileData();
         legacyTileData.keySet().forEach(regionId -> {
             profileTileData.setRegion(regionId, legacyTileData.get(regionId));
         });

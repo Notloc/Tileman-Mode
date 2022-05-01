@@ -6,6 +6,8 @@ import com.tileman.TilemanModeTile;
 import com.tileman.TilemanProfile;
 import com.tileman.multiplayer.GroupTilemanProfile;
 import com.tileman.multiplayer.TilemanMultiplayerService;
+import com.tileman.multiplayer.TilemanPacket;
+import com.tileman.runelite.TilemanModeConfig;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -20,10 +22,7 @@ public class TilemanStateManager {
     @Getter private final TilemanGameRulesManager gameRulesManager;
 
     @Getter private TilemanProfile activeProfile = TilemanProfile.NONE;
-    private ProfileTileData activeProfileTileData = null;
-
     @Getter private GroupTilemanProfile activeGroupProfile = GroupTilemanProfile.NONE;
-    @Getter private GroupTileData activeGroupTileData = null;
 
     public List<BiConsumer<TilemanProfile, GroupTilemanProfile>> onProfileChangedEvent = new ArrayList<>();
 
@@ -51,20 +50,17 @@ public class TilemanStateManager {
             GroupTilemanProfile groupProfile = GroupTilemanProfileUtil.loadGroupProfile(activeProfile, persistenceManager);
             setActiveGroupProfile(activeProfile, groupProfile);
             return;
-        } else {
-            activeGroupProfile = GroupTilemanProfile.NONE;
         }
 
-        this.activeProfileTileData = ProfileTileDataUtil.loadProfileTileData(activeProfile, persistenceManager);
+        this.activeGroupProfile = GroupTilemanProfile.NONE;
+        this.activeProfile.setTileData(ProfileTileDataUtil.loadProfileTileData(activeProfile, persistenceManager));
         this.gameRulesManager.setActiveProfile(profile);
         onProfileChangedEvent.forEach(listener -> listener.accept(profile, activeGroupProfile));
     }
 
     void setActiveGroupProfile(TilemanProfile activeProfile, GroupTilemanProfile groupProfile) {
-        this.activeProfileTileData = null;
-
         this.activeGroupProfile = groupProfile;
-        this.activeGroupTileData = ProfileTileDataUtil.loadGroupTileData(groupProfile, persistenceManager);
+        this.activeGroupProfile.setGroupTileData(ProfileTileDataUtil.loadGroupTileData(groupProfile, persistenceManager));
         this.gameRulesManager.setActiveGroupProfile(activeProfile, groupProfile);
         onProfileChangedEvent.forEach(listener -> listener.accept(activeProfile, activeGroupProfile));
     }
@@ -86,7 +82,9 @@ public class TilemanStateManager {
     }
 
     public ProfileTileData getActiveProfileTileData() {
-        return activeProfile.isGroupTileman() ? activeGroupTileData.getProfileTileData(activeProfile.getAccountHashLong()) : activeProfileTileData;
+        return activeProfile.isGroupTileman() ?
+                activeGroupProfile.getGroupTileData().getProfileTileData(activeProfile.getAccountHashLong()) :
+                activeProfile.getTileData();
     }
 
     public ProfileTileData getProfileDataForProfile(TilemanProfile profile) {
@@ -97,21 +95,38 @@ public class TilemanStateManager {
         if (accountHash == -1) {
             return null;
         }
-        if (activeGroupTileData != null) {
-            return activeGroupTileData.getProfileTileData(accountHash);
-        } else if (activeProfile != null && accountHash == activeProfile.getAccountHashLong()) {
-            return activeProfileTileData;
+        if (activeProfile.isGroupTileman()) {
+            return activeGroupProfile.getGroupTileData().getProfileTileData(accountHash);
+        } else if (accountHash == activeProfile.getAccountHashLong()) {
+            return activeProfile.getTileData();
         }
         return null;
     }
 
     public Collection<ProfileTileData> getAllActiveProfileTileData() {
         if (activeProfile.isGroupTileman()) {
-            return activeGroupTileData.getAllProfileTileData();
+            return activeGroupProfile.getGroupTileData().getAllProfileTileData();
         } else {
             List<ProfileTileData> list = new ArrayList<>();
-            list.add(activeProfileTileData);
+            list.add(activeProfile.getTileData());
             return list;
+        }
+    }
+
+    public void assignGroupProfile(TilemanProfile profile, GroupTilemanProfile groupProfile) {
+        if (profile == TilemanProfile.NONE) {
+            return;
+        }
+
+        profile.joinMultiplayerGroup(groupProfile);
+        persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, profile.getProfileKey(), profile);
+        persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, groupProfile.getGroupTilemanProfileKey(), groupProfile);
+
+        if (activeProfile.equals(profile)) {
+            // Load the group tiles. This automatically imports your tiles from single player
+            activeGroupProfile = groupProfile;
+            activeGroupProfile.setGroupTileData(ProfileTileDataUtil.loadGroupTileData(groupProfile, persistenceManager));
+            activeProfile.setTileData(null); // Allow GC of loaded single player data
         }
     }
 
@@ -121,9 +136,9 @@ public class TilemanStateManager {
         }
 
         if (activeProfile.isGroupTileman()) {
-            return activeGroupTileData.countTiles();
+            return activeGroupProfile.getGroupTileData().countTiles();
         } else {
-            return activeProfileTileData.countTiles();
+            return activeProfile.getTileData().countTiles();
         }
     }
 }

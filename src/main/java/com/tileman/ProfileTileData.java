@@ -9,17 +9,8 @@ import java.util.function.Consumer;
 
 // TODO: make threadsafe
 public class ProfileTileData {
-    private final long accountHash;
     private ConcurrentSetMap<Integer, TilemanModeTile> tilesByRegion = new ConcurrentSetMap<>();
     private int tileCount = 0;
-
-    public ProfileTileData(TilemanProfile profile) {
-        this(profile.getAccountHashLong());
-    }
-
-    public ProfileTileData(long accountHash) {
-        this.accountHash = accountHash;
-    }
 
     public void forEachRegion(BiConsumer<Integer, Set<TilemanModeTile>> consumer) {
         tilesByRegion.keySet().forEach(regionId -> {
@@ -64,7 +55,6 @@ public class ProfileTileData {
             tileCount--;
         }
     }
-
 
     public int countTiles() {
         return tileCount;

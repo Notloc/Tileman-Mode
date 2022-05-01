@@ -1,10 +1,16 @@
 package com.tileman.multiplayer.server;
 
+import com.tileman.GroupTileData;
+import com.tileman.ProfileTileData;
 import com.tileman.TilemanModeTile;
-import com.tileman.managers.GroupTilemanProfileUtil;
+import com.tileman.TilemanProfile;
+import com.tileman.managers.PersistenceManager;
+import com.tileman.managers.ProfileTileDataUtil;
+import com.tileman.multiplayer.GroupTilemanProfile;
 import com.tileman.multiplayer.MpUtil;
 import com.tileman.multiplayer.TilemanMultiplayerService;
 import com.tileman.multiplayer.TilemanPacket;
+import com.tileman.runelite.TilemanModeConfig;
 import lombok.Getter;
 
 import java.io.*;
@@ -13,10 +19,13 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+
+//TODO: make threadsafe
 public class TilemanServer extends Thread {
 
     @Getter
-    private final GroupTilemanProfileUtil groupProfileManager;
+    private GroupTilemanProfile groupProfile;
+    private final PersistenceManager persistenceManager;
 
     @Getter
     private final int portNumber;
@@ -27,11 +36,54 @@ public class TilemanServer extends Thread {
 
     private boolean isShutdown;
 
-    public TilemanServer(GroupTilemanProfileUtil groupProfileManager, int portNumber, String password) {
-        this.groupProfileManager = groupProfileManager;
+    public TilemanServer(GroupTilemanProfile groupProfile, PersistenceManager persistenceManager, int portNumber, String password) {
+        this.groupProfile = groupProfile;
+        this.persistenceManager = persistenceManager;
         this.portNumber = portNumber;
         this.hashedPassword = MpUtil.sha512(password);
     }
+
+    public void addGroupMember(TilemanProfile profile) {
+        groupProfile.addMember(profile);
+        persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, groupProfile.getGroupTilemanProfileKey(), groupProfile);
+    }
+
+
+
+    public void updateGroupProfileIfNewer(GroupTilemanProfile incomingGroupProfile, long sender) {
+        boolean incomingIsNewer = incomingGroupProfile.getLastUpdated().isAfter(groupProfile.getLastUpdated());
+        if (incomingIsNewer && validateGroupChanges(groupProfile, incomingGroupProfile, sender)) {
+            GroupTileData groupTileData = this.groupProfile.getGroupTileData();
+            this.groupProfile = incomingGroupProfile;
+            this.groupProfile.setGroupTileData(groupTileData);
+            persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, groupProfile.getGroupTilemanProfileKey(), groupProfile);
+
+            //purgeInvalidMemberData();
+            //reauthenticateConnections();
+            //forwardGroupProfile()
+        }
+    }
+
+    private boolean validateGroupChanges(GroupTilemanProfile current, GroupTilemanProfile incoming, long sender) {
+        if (!incoming.getMultiplayerGroupId().equals(current.getMultiplayerGroupId())) {
+            return false; // Different group?
+        }
+
+        if (incoming.getGroupCreatorAccountHash() == null || incoming.getGroupCreatorAccountHash().isEmpty()) {
+            return false;
+        }
+
+        if (!current.getGroupCreatorAccountHash().equals(incoming.getGroupCreatorAccountHash()) && sender != current.getGroupCreatorAccountHashLong()) {
+            return false; // Only allow the leader to relinquish group ownership themselves.
+        }
+
+        if (incoming.getGroupMemberAccountHashes() == null || incoming.getGroupMemberAccountHashes().isEmpty()) {
+            return false;
+        }
+
+        return true;
+    }
+
 
     @Override
     public void run() {
@@ -76,7 +128,19 @@ public class TilemanServer extends Thread {
         } catch (IOException e) {}
     }
 
-    void forwardTileUpdate(long sender, TilemanModeTile tile, boolean state) {
+    void updateTile(long accountHash, TilemanModeTile tile, boolean state) {
+        ProfileTileData tileData = groupProfile.getGroupTileData().getProfileTileData(accountHash);
+        if (state) {
+            tileData.addTile(tile.getRegionId(), tile);
+        } else {
+            tileData.removeTile(tile.getRegionId(), tile);
+        }
+
+        forwardTileUpdate(accountHash, tile, state);
+        ProfileTileDataUtil.saveRegion(accountHash, tile.getRegionId(), tileData.getRegion(tile.getRegionId()), persistenceManager);
+    }
+
+    private void forwardTileUpdate(long sender, TilemanModeTile tile, boolean state) {
         // Send the update to all connected players
         queueOutputForAllConnections(
                 TilemanPacket.createTileUpdatePacket(state),
@@ -93,7 +157,8 @@ public class TilemanServer extends Thread {
     }
 
     private void queueOutputForConnection(TilemanServerConnectionHandler connection, Object... data) {
-        connection.queueData(data);
+        // if connection is ready
+            connection.queueData(data);
     }
 
     public boolean isRequiresPassword() {

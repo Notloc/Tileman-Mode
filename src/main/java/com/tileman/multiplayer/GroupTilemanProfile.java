@@ -1,6 +1,9 @@
 package com.tileman.multiplayer;
 
+import com.tileman.GroupTileData;
 import com.tileman.TilemanProfile;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -12,16 +15,26 @@ public class GroupTilemanProfile implements Serializable {
 
     private final String groupName;
     private final String groupCreatorAccountHash;
+
+    @Getter
     private final String multiplayerGroupId;
 
     private final List<String> groupMemberAccountHashes = new ArrayList<>();
     private final Map<String, String> groupMemberNames = new HashMap<>();
+
+    @Getter
+    private LocalDateTime lastUpdated;
+
+    @Getter @Setter
+    private transient GroupTileData groupTileData;
 
     public GroupTilemanProfile(String groupName, long accountHash, String accountName) {
         this.groupName = groupName;
         this.groupCreatorAccountHash = String.valueOf(accountHash);
         this.multiplayerGroupId = groupCreatorAccountHash+ "_" + groupName;
         addMember(accountHash, accountName);
+
+        lastUpdated = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     public String getGroupCreatorAccountHash() {
@@ -43,6 +56,7 @@ public class GroupTilemanProfile implements Serializable {
 
         groupMemberAccountHashes.add(accountHashString);
         groupMemberNames.put(accountHashString, accountName);
+        lastUpdated = LocalDateTime.now(ZoneOffset.UTC);
         return true;
     }
 
@@ -50,6 +64,7 @@ public class GroupTilemanProfile implements Serializable {
         String accountHashString = String.valueOf(accountHash);
         groupMemberAccountHashes.remove(accountHashString);
         groupMemberNames.remove(accountHashString);
+        lastUpdated = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     public boolean isMember(long accountHash) {

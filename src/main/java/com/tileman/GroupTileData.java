@@ -48,11 +48,12 @@ public class GroupTileData {
 
     private void ensureAccountHash(long accountHash) {
         if (!tileDataByAccount.containsKey(accountHash)) {
-            tileDataByAccount.put(accountHash, new ProfileTileData(accountHash));
+            tileDataByAccount.put(accountHash, new ProfileTileData());
         }
     }
 
     public ProfileTileData getProfileTileData(long accountHash) {
+        ensureAccountHash(accountHash);
         return tileDataByAccount.get(accountHash);
     }
 

@@ -1,6 +1,7 @@
 package com.tileman.multiplayer;
 
 import com.tileman.GroupTileData;
+import com.tileman.ProfileTileData;
 import com.tileman.TilemanModeTile;
 
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 
 public abstract class TilemanMultiplayerThread extends Thread {
+    private static final int NETWORK_TIMEOUT_MS = 15000;
 
     protected ConcurrentOutputQueue<Object> outputQueue;
 
@@ -30,19 +32,43 @@ public abstract class TilemanMultiplayerThread extends Thread {
     protected abstract void onUpdate() throws NetworkShutdownException, NetworkTimeoutException;
     protected abstract void onShutdown();
 
-    protected boolean handlePacket(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+
+    protected void requestGroupProfile() {
+        outputQueue.queueData(
+                TilemanPacket.createGroupProfileRequest(),
+                TilemanPacket.createEndOfDataPacket()
+        );
+    }
+
+    protected void sendGroupProfile(GroupTilemanProfile groupProfile) {
+        outputQueue.queueData(
+                TilemanPacket.createGroupProfileResponse(),
+                groupProfile,
+                TilemanPacket.createEndOfDataPacket()
+        );
+    }
+
+    protected GroupTilemanProfile handleGroupProfileResponse(ObjectInputStreamBufferThread input) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
+        GroupTilemanProfile groupProfile = input.waitForNextObject(this);
+        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+        return groupProfile;
+    }
+
+
+
+    protected boolean handlePacket(GroupTilemanProfile groupProfile, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
         switch (packet.packetType) {
             case TILE_UPDATE:
-                handleTileUpdate(groupTileData, packet, input);
+                handleTileUpdate(groupProfile.getGroupTileData(), packet, input);
                 break;
             case REGION_DATA_REQUEST:
-                handleRegionDataRequest(groupTileData, input);
+                handleRegionDataRequest(groupProfile.getGroupTileData(), input);
                 break;
             case REGION_DATA_RESPONSE:
-                handleRegionDataResponse(groupTileData, input);
+                handleRegionDataResponse(groupProfile.getGroupTileData(), input);
                 break;
             case REGION_HASH_REPORT:
-                handleRegionHashReport(groupTileData, input);
+                handleRegionHashReport(groupProfile.getGroupTileData(), input);
                 break;
             default:
                 return false;
@@ -52,11 +78,11 @@ public abstract class TilemanMultiplayerThread extends Thread {
 
     protected abstract void handleTileUpdate(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException;
 
-    protected void sendRegionHashReport(ConcurrentSetMap<Integer, TilemanModeTile> tileDataByRegion, long accountHash) {
+    protected void sendRegionHashReport(ProfileTileData tileData, long accountHash) {
         List<RegionDataHash> regionHashData = new ArrayList<>();
 
-        tileDataByRegion.keySet().stream().forEach(regionId -> {
-            int regionHash = tileDataByRegion.get(regionId).hashCode();
+        tileData.forEachRegion((regionId, regionTiles) -> {
+            int regionHash = regionTiles.hashCode();
             regionHashData.add(new RegionDataHash(accountHash, regionId, regionHash));
         });
 
@@ -129,7 +155,7 @@ public abstract class TilemanMultiplayerThread extends Thread {
     }
 
     public void executeInBusyLoop(BusyFunction function) throws InterruptedException, UnexpectedPacketTypeException, NetworkShutdownException, NetworkTimeoutException {
-        executeInBusyLoop(function, 25, 25000);
+        executeInBusyLoop(function, 25, NETWORK_TIMEOUT_MS);
     }
 
     public void executeInBusyLoop(BusyFunction function, long sleepMs, long timeout) throws InterruptedException, UnexpectedPacketTypeException, NetworkShutdownException, NetworkTimeoutException {

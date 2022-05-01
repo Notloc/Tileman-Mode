@@ -14,7 +14,6 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
     private final TilemanServer server;
     private final Socket connection;
 
-    private final GroupTilemanProfileUtil profileManager;
 
     private TilemanProfile connectionProfile;
     private ObjectInputStreamBufferThread inputThread;
@@ -22,7 +21,6 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
     public TilemanServerConnectionHandler(TilemanServer server, Socket connection) throws IOException {
         this.server = server;
         this.connection = connection;
-        this.profileManager = server.getGroupProfileManager();
         this.outputQueue = new ConcurrentOutputQueue<>(connection.getOutputStream());
     }
 
@@ -36,9 +34,13 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
 
             boolean authenticated = awaitAuthentication(inputThread);
             sendAuthenticationResponse(authenticated);
-            if (authenticated) {
-                return true;
+            if (!authenticated) {
+                return false;
             }
+
+            handleGroupProfileSync(inputThread);
+
+
         } catch (NetworkShutdownException e) {
             e.printStackTrace();
         } catch (UnexpectedPacketTypeException e) {
@@ -58,16 +60,23 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
         assertPacketType(packet, TilemanPacketType.AUTHENTICATION);
         connectionProfile = inputThread.waitForNextObject(this);
 
-        if (profileManager.isMember(connectionProfile.getAccountHashLong())) {
-            return true;
-        } else if (server.isRequiresPassword()) {
+        GroupTilemanProfile group = server.getGroupProfile();
+
+         if (server.isRequiresPassword()) {
             String hashedPassword = packet.message;
             if (!server.authenticatePassword(hashedPassword)) {
                 return false;
             }
         }
 
-        profileManager.addMember(connectionProfile);
+        if (group.isMember(connectionProfile.getAccountHashLong())) {
+            return true;
+        }
+
+        // if server is not accepting new members and not on preapproval list
+            //return false
+
+        server.addGroupMember(connectionProfile);
         return true;
     }
 
@@ -77,6 +86,18 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
                 TilemanPacket.createEndOfDataPacket()
         );
         outputQueue.flush();
+    }
+
+    private void handleGroupProfileSync(ObjectInputStreamBufferThread inputThread) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
+        TilemanPacket packet = inputThread.waitForNextPacket(this);
+        if (packet.packetType == TilemanPacketType.GROUP_PROFILE_REQUEST) {
+            assertPacketType(inputThread.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+        } else if (packet.packetType == TilemanPacketType.GROUP_PROFILE_RESPONSE) {
+            GroupTilemanProfile incomingGroupProfile = inputThread.waitForNextObject(this);
+            assertPacketType(inputThread.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+            server.updateGroupProfileIfNewer(incomingGroupProfile, connectionProfile.getAccountHashLong());
+        }
+        sendGroupProfile(server.getGroupProfile());
     }
 
     @Override
@@ -103,7 +124,7 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
 
             TilemanPacket packet = inputThread.tryGetNextPacket();
             if (packet != null) {
-                handlePacket(server.getGroupTileData(), packet, inputThread);
+                handlePacket(server.getGroupProfile(), packet, inputThread);
             }
         } catch (UnexpectedPacketTypeException e) {
             e.printStackTrace();
@@ -115,14 +136,14 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
     }
 
     @Override
-    protected boolean handlePacket(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        if (super.handlePacket(groupTileData, packet, input)) {
+    protected boolean handlePacket(GroupTilemanProfile groupProfile, TilemanPacket packet, ObjectInputStreamBufferThread input) throws NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        if (super.handlePacket(groupProfile, packet, input)) {
             return true;
         }
 
         switch (packet.packetType) {
             case TILE_SYNC_REQUEST:
-                handleTileSyncRequest(groupTileData);
+                handleTileSyncRequest(groupProfile.getGroupTileData());
                 break;
             default:
                 throw new UnexpectedPacketTypeException("Unexpected packet type in server: " + packet.packetType);
@@ -139,15 +160,14 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
         boolean state = Boolean.parseBoolean(packet.message);
         long accountHash = connectionProfile.getAccountHashLong();
 
-        groupTileData.setTile(accountHash, tile, state);
-        server.forwardTileUpdate(accountHash, tile, state);
+        server.updateTile(accountHash, tile, state);
     }
 
     private void handleTileSyncRequest(GroupTileData groupTileData) {
         Long myAccount = connectionProfile.getAccountHashLong();
-        groupTileData.forEachProfile(accountHash -> {
+        groupTileData.forEachProfile((accountHash, tileData) -> {
             if (!accountHash.equals(myAccount)) {
-                sendRegionHashReport(groupTileData.getProfileTileData(accountHash), accountHash);
+                sendRegionHashReport(tileData, accountHash);
             }
         });
     }
