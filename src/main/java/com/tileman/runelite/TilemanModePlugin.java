@@ -30,6 +30,7 @@ package com.tileman.runelite;
 import com.google.inject.Provides;
 import com.tileman.ProfileTileData;
 import com.tileman.Util;
+import com.tileman.managers.PersistenceManager;
 import com.tileman.managers.RunelitePersistenceManager;
 import com.tileman.managers.TilemanGameRulesManager;
 import com.tileman.managers.TilemanStateManager;
@@ -64,7 +65,7 @@ import java.util.stream.Collectors;
         description = "Automatically draws tiles where you walk",
         tags = {"overlay", "tiles"}
 )
-class TilemanModePlugin extends Plugin {
+public class TilemanModePlugin extends Plugin {
     private static final String MARK = "Unlock Tileman tile";
     private static final String UNMARK = "Clear Tileman tile";
     private static final String WALK_HERE = "Walk here";
@@ -230,7 +231,9 @@ class TilemanModePlugin extends Plugin {
         tutorialIslandRegionIds.add(12336);
         tutorialIslandRegionIds.add(12592);
 
-        tilemanStateManager = new TilemanStateManager(new RunelitePersistenceManager(configManager));
+        RunelitePersistenceManager persistenceManager = new RunelitePersistenceManager(configManager);
+
+        tilemanStateManager = new TilemanStateManager(persistenceManager);
         onLoginStateChangedEvent.add((isLoggedIn, accountHash) -> {
            if (isLoggedIn) {
                tilemanStateManager.onLoggedIn(accountHash);
@@ -247,7 +250,7 @@ class TilemanModePlugin extends Plugin {
         updateTileInfoDisplay();
         log.debug("startup");
 
-        TilemanPluginPanel panel = new TilemanPluginPanel(this, client, tilemanStateManager);
+        TilemanPluginPanel panel = new TilemanPluginPanel(this, client, tilemanStateManager, persistenceManager);
 
         NavigationButton navButton = NavigationButton.builder()
                 .tooltip("Tileman Mode")

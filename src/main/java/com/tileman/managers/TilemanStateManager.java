@@ -44,7 +44,7 @@ public class TilemanStateManager {
         return !activeProfile.equals(TilemanProfile.NONE);
     }
 
-    void setActiveProfile(TilemanProfile profile) {
+    public void setActiveProfile(TilemanProfile profile) {
         this.activeProfile = profile;
         if (activeProfile.isGroupTileman()) {
             GroupTilemanProfile groupProfile = GroupTilemanProfileUtil.loadGroupProfile(activeProfile, persistenceManager);

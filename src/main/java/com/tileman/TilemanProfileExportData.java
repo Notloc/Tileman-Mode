@@ -28,20 +28,21 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class TilemanProfileExportData implements Serializable {
 
     public TilemanProfile profile;
     public ArrayList<Integer> regionIds;
-    public ArrayList<List<TilemanModeTile>> regionTiles;
+    public ArrayList<Set<TilemanModeTile>> regionTiles;
 
-    public TilemanProfileExportData(TilemanProfile profile, Map<Integer, List<TilemanModeTile>> tileDataByRegion) {
+    public TilemanProfileExportData(TilemanProfile profile, ProfileTileData tileData) {
         this.profile = profile;
         this.regionIds = new ArrayList<>();
         this.regionTiles = new ArrayList<>();
-        for (Integer regionId : tileDataByRegion.keySet()) {
+        tileData.forEachRegion((regionId, tiles) -> {
             regionIds.add(regionId);
-            regionTiles.add(tileDataByRegion.get(regionId));
-        }
+            regionTiles.add(tiles);
+        });
     }
 }

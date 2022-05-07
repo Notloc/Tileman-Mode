@@ -1,6 +1,6 @@
 package com.tileman.runelite;
 
-import com.tileman.managers.TilemanStateManager;
+import com.tileman.managers.*;
 import com.tileman.multiplayer.TilemanMultiplayerService;
 import com.tileman.TilemanGameMode;
 import com.tileman.TilemanProfile;
@@ -36,16 +36,18 @@ public class TilemanPluginPanel extends PluginPanel {
     private final TilemanModePlugin plugin;
     private final TilemanStateManager stateManager;
     private final Client client;
+    private final RunelitePersistenceManager persistenceManager;
 
     private boolean showExportInfo = false;
     private boolean gameModeOpen = false;
     private boolean advancedOpen = false;
     private boolean isMultiplayerOpen = false;
 
-    public TilemanPluginPanel(TilemanModePlugin plugin, Client client, TilemanStateManager stateManager) {
+    public TilemanPluginPanel(TilemanModePlugin plugin, Client client, TilemanStateManager stateManager, RunelitePersistenceManager persistenceManager) {
         this.plugin = plugin;
         this.client = client;
         this.stateManager = stateManager;
+        this.persistenceManager = persistenceManager;
         build();
     }
 
@@ -123,18 +125,20 @@ public class TilemanPluginPanel extends PluginPanel {
                 createProfileButton.addActionListener(l -> {
                     TilemanProfile profile = TilemanProfile.NONE;
 
+                    String rsn = client.getLocalPlayer().getName();
+
                     Object[] options = new Object[] {"New Profile", "Import Existing Data"};
                     int choice = JOptionPane.showOptionDialog(null, "Create a profile:", "Create Profile", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, null);
 
                     if (choice == 0) {
-                        profile = stateManager.createProfile();
+                        profile = TilemanProfileUtil.createProfile(client.getAccountHash(), rsn, persistenceManager);
                     } else if (choice == 1) {
                         options = new Object[] {"Import Old Tile Data", "Import Ground Marker Data", "Manual Import"};
                         choice = JOptionPane.showOptionDialog(null, "Choose how to import existing tile data:", "Import Existing Data", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, null);
                         if (choice == 0) {
-                            profile = stateManager.createProfileWithLegacyData();
+                            profile = TilemanProfileUtil.createProfileWithLegacyData(client.getAccountHash(), rsn, persistenceManager);
                         } else if (choice == 1) {
-                            profile = stateManager.createProfileWithGroundMarkerData();
+                            profile = TilemanProfileUtil.createProfileWithGroundMarkerData(client.getAccountHash(), rsn, persistenceManager);
                         } else if (choice == 2) {
                             showProfileImportPanel();
                             return;
@@ -154,6 +158,8 @@ public class TilemanPluginPanel extends PluginPanel {
         List<Runnable> callbacks = new ArrayList<>();
         boolean hasActiveProfile = !stateManager.getActiveProfile().equals(TilemanProfile.NONE);
 
+        TilemanGameRulesManager gameRules = stateManager.getGameRulesManager();
+
         JPanel gameRulesPanel = new JPanel();
         gameRulesPanel.setBorder(BorderFactory.createLineBorder(Color.black));
         {
@@ -172,8 +178,8 @@ public class TilemanPluginPanel extends PluginPanel {
                     JLabel gameModeSelectLabel = new JLabel("Game Mode");
 
                     JComboBox<TilemanGameMode> gameModeSelect = new JComboBox<>(TilemanGameMode.values());
-                    gameModeSelect.setSelectedItem(stateManager.getGameMode());
-                    gameModeSelect.addActionListener(l -> stateManager.setGameMode((TilemanGameMode) gameModeSelect.getSelectedItem()));
+                    gameModeSelect.setSelectedItem(gameRules.getGameMode());
+                    gameModeSelect.addActionListener(l -> gameRules.setGameMode((TilemanGameMode) gameModeSelect.getSelectedItem()));
 
                     gameModeDropdownPanel.add(gameModeSelectLabel);
                     gameModeDropdownPanel.add(gameModeSelect);
@@ -196,9 +202,9 @@ public class TilemanPluginPanel extends PluginPanel {
                     customGameModeCollapsable.add(customGameMode, BorderLayout.NORTH);
 
                     customGameMode.setAlignmentX(CENTER_ALIGNMENT);
-                    customGameMode.setSelected(stateManager.isEnableCustomGameMode());
+                    customGameMode.setSelected(gameRules.isEnableCustomGameMode());
                     customGameMode.addActionListener(l ->  {
-                        stateManager.setEnableCustomGameMode(customGameMode.isSelected());
+                        gameRules.setEnableCustomGameMode(customGameMode.isSelected());
                         rebuild();
                     });
                 }
@@ -206,31 +212,31 @@ public class TilemanPluginPanel extends PluginPanel {
                 {
                     JPanel rulesPanel = new JPanel();
                     addVerticalLayout(rulesPanel);
-                    callbacks.add(() -> setJComponentEnabled(rulesPanel, stateManager.isEnableCustomGameMode()));
+                    callbacks.add(() -> setJComponentEnabled(rulesPanel, gameRules.isEnableCustomGameMode()));
 
                     customGameModeCollapsable.add(rulesPanel, BorderLayout.CENTER);
 
                     {
                         JCheckBox allowTileDeficit = new JCheckBox("Allow Tile Deficit");
                         allowTileDeficit.setAlignmentX(CENTER_ALIGNMENT);
-                        allowTileDeficit.setSelected(stateManager.isAllowTileDeficit());
-                        allowTileDeficit.addActionListener(l -> stateManager.setAllowTileDeficit(allowTileDeficit.isSelected()));
+                        allowTileDeficit.setSelected(gameRules.isAllowTileDeficit());
+                        allowTileDeficit.addActionListener(l -> gameRules.setAllowTileDeficit(allowTileDeficit.isSelected()));
                         rulesPanel.add(allowTileDeficit);
                     }
 
                     {
                         JCheckBox tilesFromLevels = new JCheckBox("Tiles From Levels");
                         tilesFromLevels.setAlignmentX(CENTER_ALIGNMENT);
-                        tilesFromLevels.setSelected(stateManager.isTilesFromTotalLevel());
-                        tilesFromLevels.addActionListener(l -> stateManager.setTilesFromTotalLevel(tilesFromLevels.isSelected()));
+                        tilesFromLevels.setSelected(gameRules.isTilesFromTotalLevel());
+                        tilesFromLevels.addActionListener(l -> gameRules.setTilesFromTotalLevel(tilesFromLevels.isSelected()));
                         rulesPanel.add(tilesFromLevels);
                     }
 
                     {
                         JCheckBox tilesFromExp = new JCheckBox("Tiles From Exp");
                         tilesFromExp.setAlignmentX(CENTER_ALIGNMENT);
-                        tilesFromExp.setSelected(stateManager.isTilesFromExp());
-                        tilesFromExp.addActionListener(l -> stateManager.setTilesFromExp(tilesFromExp.isSelected()));
+                        tilesFromExp.setSelected(gameRules.isTilesFromExp());
+                        tilesFromExp.addActionListener(l -> gameRules.setTilesFromExp(tilesFromExp.isSelected()));
                         rulesPanel.add(tilesFromExp);
                     }
 
@@ -241,10 +247,10 @@ public class TilemanPluginPanel extends PluginPanel {
                         JLabel tileOffsetLabel = new JLabel("Tile Offset");
                         tileOffsetPanel.add(tileOffsetLabel);
 
-                        SpinnerNumberModel numberModel = new SpinnerNumberModel(stateManager.getTilesOffset(), MIN_TILE_OFFSET, MAX_TILE_OFFSET, 1);
+                        SpinnerNumberModel numberModel = new SpinnerNumberModel(gameRules.getTilesOffset(), MIN_TILE_OFFSET, MAX_TILE_OFFSET, 1);
                         JSpinner tilesOffsetSpinner = new JSpinner(numberModel);
                         ((JSpinner.DefaultEditor)tilesOffsetSpinner.getEditor()).getTextField().setColumns(7); // Makes the width of the spinner reasonable
-                        tilesOffsetSpinner.addChangeListener(l -> stateManager.setTilesOffset(numberModel.getNumber().intValue()));
+                        tilesOffsetSpinner.addChangeListener(l -> gameRules.setTilesOffset(numberModel.getNumber().intValue()));
                         tileOffsetPanel.add(tilesOffsetSpinner);
                         rulesPanel.add(tileOffsetPanel);
                     }
@@ -255,9 +261,9 @@ public class TilemanPluginPanel extends PluginPanel {
 
                         JLabel expPerTileLabel = new JLabel("Exp Per Tile");
 
-                        SpinnerNumberModel numberModel = new SpinnerNumberModel(stateManager.getExpPerTile(), MIN_EXP_PER_TILE, MAX_EXP_PER_TILE, 1);
+                        SpinnerNumberModel numberModel = new SpinnerNumberModel(gameRules.getExpPerTile(), MIN_EXP_PER_TILE, MAX_EXP_PER_TILE, 1);
                         JSpinner expPerTileSpinner = new JSpinner(numberModel);
-                        expPerTileSpinner.addChangeListener(l -> stateManager.setExpPerTile(numberModel.getNumber().intValue()));
+                        expPerTileSpinner.addChangeListener(l -> gameRules.setExpPerTile(numberModel.getNumber().intValue()));
 
                         xpPanel.add(expPerTileLabel);
                         xpPanel.add(expPerTileSpinner);
@@ -302,11 +308,11 @@ public class TilemanPluginPanel extends PluginPanel {
                 multiplayerPanel.add(ipInput);
 
                 JButton connectButton = new JButton("Connect");
-                connectButton.addActionListener(e -> TilemanMultiplayerService.connect(plugin.getClient(), plugin, stateManager, ipInput.getText(), PORT, "password"));
+                connectButton.addActionListener(e -> TilemanMultiplayerService.connect(stateManager, ipInput.getText(), PORT, "password"));
                 multiplayerPanel.add(connectButton);
 
                 JButton startServerButton = new JButton("Launch Server");
-                startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(plugin.getClient(), plugin, stateManager, PORT, "password"));
+                startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(stateManager, persistenceManager, "password", PORT));
                 multiplayerPanel.add(startServerButton);
             }
         }
@@ -335,7 +341,7 @@ public class TilemanPluginPanel extends PluginPanel {
 
             exportProfileButton.addActionListener(l -> {
                 if (stateManager.hasActiveProfile()) {
-                    copyToClipboard(stateManager.exportProfileJson());
+                    copyToClipboard(TilemanProfileUtil.exportProfileJson(stateManager.getActiveProfile(), stateManager.getActiveProfileTileData()));
                     showExportInfo = true;
                     rebuild();
                 }
@@ -352,7 +358,9 @@ public class TilemanPluginPanel extends PluginPanel {
                     if (choice == 0) {
                         choice = JOptionPane.showConfirmDialog(null, "This action cannot be undone!\nPress 'Yes' to delete the profile and associated data.", "Are you sure?", JOptionPane.YES_NO_OPTION);
                         if (choice == 0) {
-                            stateManager.deleteActiveProfile();
+                            TilemanProfileUtil.deleteProfile(stateManager.getActiveProfile(), persistenceManager);
+                            ProfileTileDataUtil.deleteProfileTileData(stateManager.getActiveProfile(), stateManager.getActiveProfileTileData(), persistenceManager);
+                            stateManager.setActiveProfile(TilemanProfile.NONE);
                             rebuild();
                         }
                     }
@@ -388,7 +396,7 @@ public class TilemanPluginPanel extends PluginPanel {
 
             if (choice == 0) {
                 String maybeJson = importText.getText();
-                TilemanProfile profile = stateManager.importProfileAsNew(maybeJson, client.getAccountHash());
+                TilemanProfile profile = TilemanProfileUtil.importProfileJson(maybeJson, client.getAccountHash(), client.getLocalPlayer().getName(), persistenceManager);
                 if (profile.equals(TilemanProfile.NONE)) {
                     JOptionPane.showMessageDialog(null, "An error occured while trying to import the profile data.", "Error", JOptionPane.ERROR_MESSAGE);
                 } else {

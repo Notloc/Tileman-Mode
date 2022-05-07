@@ -29,6 +29,7 @@ package com.tileman.managers;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
+import com.tileman.ProfileTileData;
 import com.tileman.TilemanModeTile;
 import com.tileman.TilemanProfile;
 import com.tileman.runelite.TilemanModeConfig;
@@ -77,7 +78,7 @@ public final class TilemanProfileUtil {
         persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, TilemanProfile.getProfileKey(profile.getAccountHash()), profile);
     }
 
-    public static String exportProfileJson(TilemanProfile profile, Map<Integer, List<TilemanModeTile>> tileData) {
+    public static String exportProfileJson(TilemanProfile profile, ProfileTileData tileData) {
         if (profile.equals(TilemanProfile.NONE)) {
             return "";
         }
@@ -98,13 +99,13 @@ public final class TilemanProfileUtil {
         saveProfile(profile, persistenceManager);
         for (int i = 0; i < importedProfileData.regionIds.size(); i++) {
             int regionId = importedProfileData.regionIds.get(i);
-            List<TilemanModeTile> tiles = importedProfileData.regionTiles.get(i);
-            ProfileTileDataUtil.saveRegion(profile, regionId, new HashSet<>(tiles), persistenceManager);
+            Set<TilemanModeTile> tiles = importedProfileData.regionTiles.get(i);
+            ProfileTileDataUtil.saveRegion(profile, regionId, tiles, persistenceManager);
         }
         return profile;
     }
 
-    static void deleteProfile(TilemanProfile profile, PersistenceManager persistenceManager) {
+    public static void deleteProfile(TilemanProfile profile, PersistenceManager persistenceManager) {
         if (profile.equals(TilemanProfile.NONE)) {
             return;
         }

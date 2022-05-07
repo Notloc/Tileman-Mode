@@ -67,6 +67,12 @@ public final class ProfileTileDataUtil {
         return profileTileData;
     }
 
+    public static void deleteProfileTileData(TilemanProfile profile, ProfileTileData tileData, PersistenceManager persistenceManager) {
+        tileData.forEachRegion((regionId, region) -> {
+            persistenceManager.delete(TilemanModeConfig.CONFIG_GROUP, profile.getRegionKey(regionId));
+        });
+    }
+
     public static GroupTileData loadGroupTileData(GroupTilemanProfile groupProfile, PersistenceManager persistenceManager) {
         GroupTileData groupTileData = new GroupTileData();
 
