@@ -1,6 +1,7 @@
 package com.tileman.runelite;
 
 import com.tileman.managers.*;
+import com.tileman.multiplayer.GroupTilemanProfile;
 import com.tileman.multiplayer.TilemanMultiplayerService;
 import com.tileman.TilemanGameMode;
 import com.tileman.TilemanProfile;
@@ -118,6 +119,12 @@ public class TilemanPluginPanel extends PluginPanel {
                 }
             }
             profilePanel.add(profileLabel);
+
+            if (!stateManager.getActiveGroupProfile().equals(GroupTilemanProfile.NONE)) {
+                JLabel groupLabel = new JLabel(stateManager.getActiveGroupProfile().getGroupName());
+                groupLabel.setAlignmentX(CENTER_ALIGNMENT);
+                profilePanel.add(groupLabel);
+            }
 
             if (activeProfile.equals(TilemanProfile.NONE) && isLoggedIn) {
                 JButton createProfileButton = new JButton("Create");
@@ -280,44 +287,77 @@ public class TilemanPluginPanel extends PluginPanel {
     }
 
     private JPanel buildMultiplayerPanel() {
-        JCollapsePanel multiplayerPanel = new JCollapsePanel("Multiplayer", isMultiplayerOpen, isOpen -> this.isMultiplayerOpen = isOpen);
+        JCollapsePanel multiplayerPanel = new JCollapsePanel("Multiplayer", isMultiplayerOpen && stateManager.hasActiveProfile(), isOpen -> this.isMultiplayerOpen = isOpen);
         multiplayerPanel.setBorder(BorderFactory.createLineBorder(Color.black));
         multiplayerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         addVerticalLayout(multiplayerPanel.getContentPanel());
         {
-            if (TilemanMultiplayerService.isHosting()) {
-                JLabel serverLabel = new JLabel("Server is running on port " + TilemanMultiplayerService.getServerPort());
-                multiplayerPanel.add(serverLabel);
+            if (stateManager.hasActiveProfile() && stateManager.getActiveProfile().isGroupTileman()) {
 
-                JButton shutdownButton = new JButton("Shutdown Server");
-                shutdownButton.addActionListener(e -> TilemanMultiplayerService.stopServer());
-                multiplayerPanel.add(shutdownButton);
-
-                multiplayerPanel.add(Box.createVerticalStrut(20));
-            }
-
-            if (TilemanMultiplayerService.isConnected()) {
-                JLabel label = new JLabel("CONNECTED~!");
-                multiplayerPanel.add(label);
-
-                JButton disconnectButton = new JButton("Disconnect");
-                disconnectButton.addActionListener(e -> TilemanMultiplayerService.disconnect());
-                multiplayerPanel.add(disconnectButton);
             } else {
-                JTextField ipInput = new JTextField("IP Address");
-                multiplayerPanel.add(ipInput);
+                JButton createGroupButton = new JButton("Create Group");
+                createGroupButton.addActionListener(l -> {
+                    String name = JOptionPane.showInputDialog("Group Name:");
+                    while (name == null || name.length() < 3 || name.equals(GroupTilemanProfile.NONE.getGroupName())) {
+                        name = JOptionPane.showInputDialog("Group Name:");
+                    }
 
-                JButton connectButton = new JButton("Connect");
-                connectButton.addActionListener(e -> TilemanMultiplayerService.connect(stateManager, ipInput.getText(), PORT, "password"));
-                multiplayerPanel.add(connectButton);
+                    if (name == null) {
+                        return;
+                    }
 
-                JButton startServerButton = new JButton("Launch Server");
-                startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(stateManager, persistenceManager, "password", PORT));
-                multiplayerPanel.add(startServerButton);
+                    GroupTilemanProfile groupProfile = new GroupTilemanProfile(name, client.getAccountHash(), client.getLocalPlayer().getName());
+                    stateManager.assignGroupProfile(stateManager.getActiveProfile(), groupProfile);
+                });
+
+                JButton joinGroupButton = new JButton("Join Group");
+                joinGroupButton.addActionListener(l -> {
+
+                });
+
+                multiplayerPanel.add(createGroupButton);
+                multiplayerPanel.add(joinGroupButton);
+
             }
         }
+
+        setJComponentEnabled(multiplayerPanel, stateManager.hasActiveProfile());
         return multiplayerPanel;
     }
+
+    private void doIpPanel(JPanel multiplayerPanel) {
+        if (TilemanMultiplayerService.isHosting()) {
+            JLabel serverLabel = new JLabel("Server is running on port " + TilemanMultiplayerService.getServerPort());
+            multiplayerPanel.add(serverLabel);
+
+            JButton shutdownButton = new JButton("Shutdown Server");
+            shutdownButton.addActionListener(e -> TilemanMultiplayerService.stopServer());
+            multiplayerPanel.add(shutdownButton);
+
+            multiplayerPanel.add(Box.createVerticalStrut(20));
+        }
+
+        if (TilemanMultiplayerService.isConnected()) {
+            JLabel label = new JLabel("CONNECTED~!");
+            multiplayerPanel.add(label);
+
+            JButton disconnectButton = new JButton("Disconnect");
+            disconnectButton.addActionListener(e -> TilemanMultiplayerService.disconnect());
+            multiplayerPanel.add(disconnectButton);
+        } else {
+            JTextField ipInput = new JTextField("IP Address");
+            multiplayerPanel.add(ipInput);
+
+            JButton connectButton = new JButton("Connect");
+            connectButton.addActionListener(e -> TilemanMultiplayerService.connect(stateManager, ipInput.getText(), PORT, "password"));
+            multiplayerPanel.add(connectButton);
+
+            JButton startServerButton = new JButton("Launch Server");
+            startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(stateManager, persistenceManager, "password", PORT));
+            multiplayerPanel.add(startServerButton);
+        }
+    }
+
 
     private JPanel buildAdvancedOptionsPanel() {
         if (!plugin.isShowAdvancedOptions()) {

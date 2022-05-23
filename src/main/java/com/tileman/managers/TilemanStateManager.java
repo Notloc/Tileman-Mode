@@ -114,13 +114,15 @@ public class TilemanStateManager {
     }
 
     public void assignGroupProfile(TilemanProfile profile, GroupTilemanProfile groupProfile) {
-        if (profile == TilemanProfile.NONE) {
+        if (profile.equals(TilemanProfile.NONE) || groupProfile.equals(GroupTilemanProfile.NONE)) {
             return;
         }
 
         profile.joinMultiplayerGroup(groupProfile);
-        persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, profile.getProfileKey(), profile);
-        persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, groupProfile.getGroupTilemanProfileKey(), groupProfile);
+        groupProfile.addMember(profile);
+
+        TilemanProfileUtil.saveProfile(profile, persistenceManager);
+        GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
 
         if (activeProfile.equals(profile)) {
             // Load the group tiles. This automatically imports your tiles from single player

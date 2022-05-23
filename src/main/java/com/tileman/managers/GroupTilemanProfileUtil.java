@@ -7,11 +7,11 @@ import com.tileman.TilemanProfile;
 public class GroupTilemanProfileUtil {
 
 
-    static void saveGroupProfile(GroupTilemanProfile groupProfile, PersistenceManager persistenceManager) {
+    public static void saveGroupProfile(GroupTilemanProfile groupProfile, PersistenceManager persistenceManager) {
         persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, groupProfile.getGroupTilemanProfileKey(), groupProfile);
     }
 
-    static GroupTilemanProfile loadGroupProfile(TilemanProfile profile, PersistenceManager persistenceManager) {
+    public static GroupTilemanProfile loadGroupProfile(TilemanProfile profile, PersistenceManager persistenceManager) {
         return persistenceManager.loadFromJsonOrDefault(TilemanModeConfig.CONFIG_GROUP, profile.getGroupTilemanProfileKey(), GroupTilemanProfile.class, GroupTilemanProfile.NONE);
     }
 }

@@ -13,6 +13,7 @@ import java.util.*;
 public class GroupTilemanProfile implements Serializable {
     public static GroupTilemanProfile NONE = new GroupTilemanProfile("__NONE", -1, "__NONE");
 
+    @Getter
     private final String groupName;
     private final String groupCreatorAccountHash;
 
@@ -28,11 +29,11 @@ public class GroupTilemanProfile implements Serializable {
     @Getter @Setter
     private transient GroupTileData groupTileData;
 
-    public GroupTilemanProfile(String groupName, long accountHash, String accountName) {
+    public GroupTilemanProfile(String groupName, long ownerAccountHash, String ownerName) {
         this.groupName = groupName;
-        this.groupCreatorAccountHash = String.valueOf(accountHash);
-        this.multiplayerGroupId = groupCreatorAccountHash+ "_" + groupName;
-        addMember(accountHash, accountName);
+        this.groupCreatorAccountHash = String.valueOf(ownerAccountHash);
+        this.multiplayerGroupId = groupCreatorAccountHash + "_" + groupName;
+        addMember(ownerAccountHash, ownerName);
 
         lastUpdated = LocalDateTime.now(ZoneOffset.UTC);
     }
