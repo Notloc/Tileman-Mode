@@ -169,7 +169,9 @@ public class TilemanModePlugin extends Plugin {
 
     @Subscribe
     public void onGameTick(GameTick tick) {
-        autoMark();
+        if (tilemanStateManager.hasActiveProfile()) {
+            autoMark();
+        }
     }
 
     @Subscribe
@@ -279,6 +281,11 @@ public class TilemanModePlugin extends Plugin {
 
     private void updateAllVisiblePoints() {
         visiblePoints.clear();
+
+        if (!tilemanStateManager.hasActiveProfile()) {
+            return;
+        }
+
         if (tilemanStateManager.getActiveProfile().isGroupTileman()) {
             tilemanStateManager.getActiveGroupProfile().getGroupMemberAccountHashes().forEach(accountHashString -> {
                 updateVisiblePointsForAccountHash(Long.parseLong(accountHashString));
