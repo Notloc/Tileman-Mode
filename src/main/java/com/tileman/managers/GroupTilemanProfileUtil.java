@@ -14,4 +14,8 @@ public class GroupTilemanProfileUtil {
     public static GroupTilemanProfile loadGroupProfile(TilemanProfile profile, PersistenceManager persistenceManager) {
         return persistenceManager.loadFromJsonOrDefault(TilemanModeConfig.CONFIG_GROUP, profile.getGroupTilemanProfileKey(), GroupTilemanProfile.class, GroupTilemanProfile.NONE);
     }
+
+    public static void delete(GroupTilemanProfile groupProfile, PersistenceManager persistenceManager) {
+        persistenceManager.delete(TilemanModeConfig.CONFIG_GROUP, groupProfile.getGroupTilemanProfileKey());
+    }
 }

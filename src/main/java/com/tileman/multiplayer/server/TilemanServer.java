@@ -4,6 +4,7 @@ import com.tileman.GroupTileData;
 import com.tileman.ProfileTileData;
 import com.tileman.TilemanModeTile;
 import com.tileman.TilemanProfile;
+import com.tileman.managers.GroupTilemanProfileUtil;
 import com.tileman.managers.PersistenceManager;
 import com.tileman.managers.ProfileTileDataUtil;
 import com.tileman.multiplayer.GroupTilemanProfile;
@@ -16,6 +17,7 @@ import lombok.Getter;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -45,9 +47,21 @@ public class TilemanServer extends Thread {
 
     public void addGroupMember(TilemanProfile profile) {
         groupProfile.addMember(profile);
-        persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, groupProfile.getGroupTilemanProfileKey(), groupProfile);
+        GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
+        queueOutputForAllConnections(
+                TilemanPacket.createJoinEventPacket(profile.getAccountHash()),
+                TilemanPacket.createEndOfDataPacket()
+        );
     }
 
+    public void removeGroupMember(Long accountHash) {
+        groupProfile.removeMember(accountHash);
+        GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
+        queueOutputForAllConnections(
+                TilemanPacket.createLeaveEventPacket(accountHash.toString()),
+                TilemanPacket.createEndOfDataPacket()
+        );
+    }
 
 
     public void updateGroupProfileIfNewer(GroupTilemanProfile incomingGroupProfile, long sender) {
@@ -56,7 +70,7 @@ public class TilemanServer extends Thread {
             GroupTileData groupTileData = this.groupProfile.getGroupTileData();
             this.groupProfile = incomingGroupProfile;
             this.groupProfile.setGroupTileData(groupTileData);
-            persistenceManager.saveToJson(TilemanModeConfig.CONFIG_GROUP, groupProfile.getGroupTilemanProfileKey(), groupProfile);
+            GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
 
             //purgeInvalidMemberData();
             //reauthenticateConnections();
@@ -114,7 +128,8 @@ public class TilemanServer extends Thread {
             try {
                 Socket connection = serverSocket.accept();
                 startConnectionThread(connection);
-            } catch (IOException e){
+            } catch (SocketException e) {/* Server closed */}
+            catch (IOException e){
                 e.printStackTrace();
             }
         }
@@ -157,7 +172,7 @@ public class TilemanServer extends Thread {
     }
 
     private void queueOutputForConnection(TilemanServerConnectionHandler connection, Object... data) {
-        // if connection is ready
+        //TODO: if connection is ready
             connection.queueData(data);
     }
 

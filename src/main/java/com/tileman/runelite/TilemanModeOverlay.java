@@ -67,7 +67,7 @@ public class TilemanModeOverlay extends Overlay
 	public Dimension render(Graphics2D graphics)
 	{
 		plugin.getVisiblePoints().forEach((accountHash, worldPoints) -> {
-			Color color = getTileColor();
+			Color color = getTileColor(); // TODO: color by accountHash
 			for (WorldPoint point : worldPoints)
 			{
 				if (point.getPlane() != client.getPlane())

@@ -1,5 +1,6 @@
 package com.tileman.multiplayer;
 
+// TODO: convert all of these into response and request objects
 public enum TilemanPacketType {
     AUTHENTICATION,
     AUTHENTICATION_RESPONSE,
@@ -13,6 +14,9 @@ public enum TilemanPacketType {
     END_OF_DATA,
 
     TILE_SYNC_REQUEST,
+
+    JOIN_EVENT,
+    LEAVE_EVENT,
 
     REGION_HASH_REPORT,
 

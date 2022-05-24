@@ -44,6 +44,8 @@ public class TilemanStateManager {
         return !activeProfile.equals(TilemanProfile.NONE);
     }
 
+    public boolean isGroupTileman() { return activeProfile.isGroupTileman(); }
+
     public void setActiveProfile(TilemanProfile profile) {
         this.activeProfile = profile;
         if (activeProfile.isGroupTileman()) {
@@ -121,15 +123,34 @@ public class TilemanStateManager {
         profile.joinMultiplayerGroup(groupProfile);
         groupProfile.addMember(profile);
 
-        TilemanProfileUtil.saveProfile(profile, persistenceManager);
-        GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
-
         if (activeProfile.equals(profile)) {
             // Load the group tiles. This automatically imports your tiles from single player
             activeGroupProfile = groupProfile;
             activeGroupProfile.setGroupTileData(ProfileTileDataUtil.loadGroupTileData(groupProfile, persistenceManager));
             activeProfile.setTileData(null); // Allow GC of loaded single player data
+
+            onProfileChangedEvent.forEach(listener -> listener.accept(activeProfile, activeGroupProfile));
         }
+
+        TilemanProfileUtil.saveProfile(profile, persistenceManager);
+        GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
+    }
+
+    public void removeFromGroup(TilemanProfile profile) {
+        if (profile.equals(TilemanProfile.NONE) || !profile.isGroupTileman()) {
+            return;
+        }
+
+        if (TilemanMultiplayerService.isConnected()) {
+            TilemanMultiplayerService.leaveGroup();
+        }
+
+        profile.leaveMultiplayerGroup();
+        if (profile.equals(activeProfile)) {
+            setActiveProfile(profile);
+        }
+
+        TilemanProfileUtil.saveProfile(profile, persistenceManager);
     }
 
     public int countUnlockedTiles() {

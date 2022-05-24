@@ -6,13 +6,21 @@ import com.tileman.multiplayer.*;
 import com.tileman.Util;
 import com.tileman.TilemanModeTile;
 import com.tileman.TilemanProfile;
+import com.tileman.runelite.TilemanModePlugin;
+import net.runelite.api.Client;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 public class TilemanClient extends TilemanMultiplayerThread {
 
+    private final Client client;
     private final TilemanStateManager stateManager;
     private final TilemanProfile profile;
     private /*final*/ GroupTilemanProfile groupProfile;
@@ -27,7 +35,8 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
     private String password;
 
-    public TilemanClient(TilemanStateManager stateManager, String hostname, int portNumber, String password) {
+    public TilemanClient(Client client, TilemanStateManager stateManager, String hostname, int portNumber, String password) {
+        this.client = client;
         this.stateManager = stateManager;
         this.profile = stateManager.getActiveProfile();
 
@@ -96,11 +105,11 @@ public class TilemanClient extends TilemanMultiplayerThread {
     }
 
     // Get the latest group profile data from the server. In certain cases the leader will be uploading a newer version to the server/others.
-    private void syncGroupProfile() throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
-        if (!profile.isGroupTileman()) {
-            requestGroupProfile();
-        } else {
+    private void syncGroupProfile() throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException, IOException {
+        if (profile.isGroupTileman()) {
             sendGroupProfile(stateManager.getActiveGroupProfile());
+        } else {
+            requestGroupProfile();
         }
 
         GroupTilemanProfile groupProfile = handleGroupProfileResponse(inputThread);
@@ -114,6 +123,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
                 TilemanPacket.createTileSyncRequest(),
                 TilemanPacket.createEndOfDataPacket()
         );
+        outputQueue.flush();
 
         // Report state of my tiles to server
         long accountHash = profile.getAccountHashLong();
@@ -155,10 +165,13 @@ public class TilemanClient extends TilemanMultiplayerThread {
             return true;
         }
 
-        //switch (packet.packetType) {
-        //    default:
-                //throw new UnexpectedPacketTypeException("Unexpected packet type in client: " + packet.packetType);
-        //}
+        switch (packet.packetType) {
+            case JOIN_EVENT:
+                handleJoinEvent(packet, input);
+                break;
+            default:
+                throw new UnexpectedPacketTypeException("Unexpected packet type in client: " + packet.packetType);
+        }
 
         return true;
     }
@@ -179,6 +192,39 @@ public class TilemanClient extends TilemanMultiplayerThread {
         assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
 
         groupTileData.setTile(accountHash, tile, tileState);
+        TilemanMultiplayerService.updatedRegionIds.add(tile.getRegionId());
+    }
+
+    @Override
+    protected void handleLeaveEvent(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+        Long leaver = Long.parseLong(packet.message);
+        if (leaver != null) {
+            groupTileData.removeProfile(leaver);
+        }
+    }
+
+    private void handleJoinEvent(TilemanPacket packet, ObjectInputStreamBufferThread input) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
+        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+
+        List<Integer> regionIds = new ArrayList<>();
+        for (int regionId : client.getMapRegions()) {
+            regionIds.add(regionId);
+        }
+        TilemanMultiplayerService.updatedRegionIds.addAll(regionIds);
+    }
+
+    public void leaveGroup() {
+        outputQueue.queueData(
+                TilemanPacket.createLeaveEventPacket(profile.getAccountHash()),
+                TilemanPacket.createEndOfDataPacket()
+        );
+        try {
+            outputQueue.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        disconnect();
     }
 
     public void disconnect() {

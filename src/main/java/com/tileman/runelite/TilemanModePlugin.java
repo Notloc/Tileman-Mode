@@ -123,7 +123,7 @@ public class TilemanModePlugin extends Plugin {
 
     @Getter
     private Map<Long, List<WorldPoint>> visiblePoints = new HashMap<>();
-
+    private boolean updateAllPointsFlag = false;
 
     public List<BiConsumer<Boolean, Long>> onLoginStateChangedEvent = new ArrayList<>();
 
@@ -171,6 +171,7 @@ public class TilemanModePlugin extends Plugin {
     public void onGameTick(GameTick tick) {
         if (tilemanStateManager.hasActiveProfile()) {
             autoMark();
+            updateVisibleTilesIfNeeded();
         }
     }
 
@@ -182,8 +183,7 @@ public class TilemanModePlugin extends Plugin {
             return;
         }
 
-        requestMultiplayerTiles();
-        updateAllVisiblePoints();
+        requestUpdateAllVisiblePoints();
         updateTileInfoDisplay();
         inHouse = false;
     }
@@ -197,6 +197,7 @@ public class TilemanModePlugin extends Plugin {
             isLoggedIn = false;
             lastSeenGameState = GameState.LOGIN_SCREEN;
             onLoginStateChangedEvent.forEach(func -> func.accept(isLoggedIn, null));
+            TilemanMultiplayerService.disconnect();
         }
     }
 
@@ -265,7 +266,7 @@ public class TilemanModePlugin extends Plugin {
         tilemanStateManager.onProfileChangedEvent.add((localProfile, groupProfile) -> {
             panel.rebuild();
             updateTileInfoDisplay();
-            updateAllVisiblePoints();
+            requestUpdateAllVisiblePoints();
         });
         clientToolbar.addNavigation(navButton);
     }
@@ -279,6 +280,32 @@ public class TilemanModePlugin extends Plugin {
         overlayManager.remove(infoOverlay);
     }
 
+
+    private void updateVisibleTilesIfNeeded() {
+        if (updateAllPointsFlag || multiplayerRegionWasUpdated()) {
+            updateAllVisiblePoints();
+        }
+    }
+
+    private Set<Integer> regionIntersect = new HashSet<>();
+    private boolean multiplayerRegionWasUpdated() {
+        if (tilemanStateManager.isGroupTileman()) {
+            regionIntersect.clear();
+            for (int regionId : client.getMapRegions()) {
+                regionIntersect.add(regionId);
+            }
+            regionIntersect.retainAll(TilemanMultiplayerService.updatedRegionIds);// TODO: thread safety issue. Need to lock the updatedRegionIds until we clear it
+            TilemanMultiplayerService.updatedRegionIds.clear();
+
+            return !regionIntersect.isEmpty();
+        }
+        return false;
+    }
+
+    private void requestUpdateAllVisiblePoints() {
+        updateAllPointsFlag = true;
+    }
+
     private void updateAllVisiblePoints() {
         visiblePoints.clear();
 
@@ -286,7 +313,7 @@ public class TilemanModePlugin extends Plugin {
             return;
         }
 
-        if (tilemanStateManager.getActiveProfile().isGroupTileman()) {
+        if (tilemanStateManager.isGroupTileman()) {
             tilemanStateManager.getActiveGroupProfile().getGroupMemberAccountHashes().forEach(accountHashString -> {
                 updateVisiblePointsForAccountHash(Long.parseLong(accountHashString));
             });
@@ -566,6 +593,7 @@ public class TilemanModePlugin extends Plugin {
         TilemanModeTile tile = new TilemanModeTile(regionId, worldPoint.getRegionX(), worldPoint.getRegionY(), client.getPlane());
 
         tilemanStateManager.updateTileMark(regionId, tile, markedValue);
+        updateVisiblePointsForAccountHash(client.getAccountHash());
     }
 
     int getXpUntilNextTile() {
@@ -601,31 +629,5 @@ public class TilemanModePlugin extends Plugin {
                     .filter(movementFlag -> (movementFlag.flag & collisionData) != 0)
                     .collect(Collectors.toSet());
         }
-    }
-
-    private int[] mapRegionsLastSeen = null;
-    private void requestMultiplayerTiles() {
-        if (mapRegionsLastSeen == null) {
-            mapRegionsLastSeen = client.getMapRegions();
-        }
-
-        int[] newMapRegions = client.getMapRegions();
-        List<Integer> requestRegions = new ArrayList<>();
-
-        for (int newRegion : newMapRegions) {
-            boolean contains = false;
-            for (int region : mapRegionsLastSeen) {
-                if (newRegion == region) {
-                    contains = true;
-                    break;
-                }
-            }
-            if (!contains) {
-                requestRegions.add(newRegion);
-            }
-        }
-
-        //TilemanMultiplayerService.requestRegionData(requestRegions);
-        mapRegionsLastSeen = client.getMapRegions();
     }
 }

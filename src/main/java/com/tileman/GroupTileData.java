@@ -20,6 +20,14 @@ public class GroupTileData {
         allProfileTileData.add(profileTileData);
     }
 
+    public void removeProfile(Long accountHash) {
+        ProfileTileData tileData = tileDataByAccount.get(accountHash);
+        if (tileData != null) {
+            tileDataByAccount.remove(accountHash);
+            allProfileTileData.remove(tileData);
+        }
+    }
+
     public Set<TilemanModeTile> getRegion(long accountHash, int regionId) {
         if (hasRegion(accountHash, regionId)) {
             return tileDataByAccount.get(accountHash).getRegion(regionId);
@@ -41,9 +49,9 @@ public class GroupTileData {
         return true;
     }
 
-    public void setRegionTiles(long accountHash, int regionId, TilemanModeTile[] tiles) {
+    public void setRegionTiles(long accountHash, int regionId, Collection<TilemanModeTile> tiles) {
         ensureAccountHash(accountHash);
-        tileDataByAccount.get(accountHash).setRegion(regionId, Arrays.asList(tiles));
+        tileDataByAccount.get(accountHash).setRegion(regionId, tiles);
     }
 
     private void ensureAccountHash(long accountHash) {

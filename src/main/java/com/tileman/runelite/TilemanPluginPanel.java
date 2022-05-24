@@ -198,7 +198,7 @@ public class TilemanPluginPanel extends PluginPanel {
 
 
             {
-                JCollapsePanel customGameModeCollapsable = new JCollapsePanel("Custom Game Mode", gameModeOpen, (Boolean state) -> this.gameModeOpen = state);
+                JCollapsePanel customGameModeCollapsable = new JCollapsePanel("Custom Game Mode", gameModeOpen && hasActiveProfile, (Boolean state) -> this.gameModeOpen = state);
                 customGameModeCollapsable.setBorder(BorderFactory.createLineBorder(Color.black));
                 customGameModeCollapsable.setInnerLayout(new BorderLayout());
 
@@ -270,6 +270,47 @@ public class TilemanPluginPanel extends PluginPanel {
         {
             if (stateManager.hasActiveProfile() && stateManager.getActiveProfile().isGroupTileman()) {
 
+                if (TilemanMultiplayerService.isHosting()) {
+                    JButton disconnectButton = new JButton("Stop Server");
+                    disconnectButton.addActionListener(l -> {
+                        TilemanMultiplayerService.disconnect();
+                        TilemanMultiplayerService.stopServer();
+                    });
+                    multiplayerPanel.add(disconnectButton);
+                } else if (!TilemanMultiplayerService.isConnected()) {
+                    JButton hostButton = new JButton("Host Server");
+                    hostButton.addActionListener(l -> {
+                        TilemanMultiplayerService.startServer(stateManager, persistenceManager, "password", 7777);
+                        TilemanMultiplayerService.connect(client, stateManager, "localhost", 7777,"password");
+                    });
+                    multiplayerPanel.add(hostButton);
+                }
+
+                if (TilemanMultiplayerService.isConnected()) {
+                    JButton disconnectButton = new JButton("Disconnect");
+                    disconnectButton.addActionListener(l -> {
+                        TilemanMultiplayerService.disconnect();
+                    });
+                    multiplayerPanel.add(disconnectButton);
+                } else {
+
+                    JButton connectButton = new JButton("Connect To Server");
+                    connectButton.addActionListener(l -> {
+                        doServerConnectionDialog();
+                        rebuild();
+                    });
+
+                    multiplayerPanel.add(connectButton);
+                }
+
+                // TODO: Double confirmation box this
+                JButton leaveGroupButton = new JButton("Leave Group");
+                leaveGroupButton.addActionListener(l -> {
+                    stateManager.removeFromGroup(stateManager.getActiveProfile());
+                });
+
+                multiplayerPanel.add(leaveGroupButton);
+
             } else {
                 JButton createGroupButton = new JButton("Create Group");
                 createGroupButton.addActionListener(l -> {
@@ -284,11 +325,12 @@ public class TilemanPluginPanel extends PluginPanel {
 
                     GroupTilemanProfile groupProfile = new GroupTilemanProfile(name, client.getAccountHash(), client.getLocalPlayer().getName());
                     stateManager.assignGroupProfile(stateManager.getActiveProfile(), groupProfile);
+                    rebuild();
                 });
 
                 JButton joinGroupButton = new JButton("Join Group");
                 joinGroupButton.addActionListener(l -> {
-
+                    doServerConnectionDialog();
                 });
 
                 multiplayerPanel.add(createGroupButton);
@@ -301,39 +343,29 @@ public class TilemanPluginPanel extends PluginPanel {
         return multiplayerPanel;
     }
 
-    private void doIpPanel(JPanel multiplayerPanel) {
-        if (TilemanMultiplayerService.isHosting()) {
-            JLabel serverLabel = new JLabel("Server is running on port " + TilemanMultiplayerService.getServerPort());
-            multiplayerPanel.add(serverLabel);
+    private boolean doServerConnectionDialog() {
+        JPanel dialogPanel = new JPanel();
 
-            JButton shutdownButton = new JButton("Shutdown Server");
-            shutdownButton.addActionListener(e -> TilemanMultiplayerService.stopServer());
-            multiplayerPanel.add(shutdownButton);
+        JTextField ipInput = new JTextField("IP Address");
+        dialogPanel.add(ipInput);
 
-            multiplayerPanel.add(Box.createVerticalStrut(20));
+        SpinnerNumberModel portModel = new SpinnerNumberModel(7777, 1, 65535, 1);
+        JSpinner portInput = new JSpinner(portModel);
+        ((JSpinner.DefaultEditor)portInput.getEditor()).getTextField().setColumns(5); // Makes the width of the spinner reasonable
+        dialogPanel.add(portInput);
+
+        int option = JOptionPane.showConfirmDialog(null, dialogPanel, "Connect to Server", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.CANCEL_OPTION) {
+            return false;
         }
 
-        if (TilemanMultiplayerService.isConnected()) {
-            JLabel label = new JLabel("CONNECTED~!");
-            multiplayerPanel.add(label);
-
-            JButton disconnectButton = new JButton("Disconnect");
-            disconnectButton.addActionListener(e -> TilemanMultiplayerService.disconnect());
-            multiplayerPanel.add(disconnectButton);
-        } else {
-            JTextField ipInput = new JTextField("IP Address");
-            multiplayerPanel.add(ipInput);
-
-            JButton connectButton = new JButton("Connect");
-            connectButton.addActionListener(e -> TilemanMultiplayerService.connect(stateManager, ipInput.getText(), PORT, "password"));
-            multiplayerPanel.add(connectButton);
-
-            JButton startServerButton = new JButton("Launch Server");
-            startServerButton.addActionListener(e -> TilemanMultiplayerService.startServer(stateManager, persistenceManager, "password", PORT));
-            multiplayerPanel.add(startServerButton);
-        }
+        return doTryToConnectDialog(ipInput.getText(), portModel.getNumber().intValue(), "password");
     }
 
+    private boolean doTryToConnectDialog(String ip, int port, String password) {
+        TilemanMultiplayerService.connect(client, stateManager, ip, port, password);
+        return true;
+    }
 
     private JPanel buildAdvancedOptionsPanel() {
         if (!plugin.isShowAdvancedOptions()) {

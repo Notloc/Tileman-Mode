@@ -3,10 +3,7 @@ package com.tileman;
 import net.runelite.api.Client;
 import net.runelite.api.coords.WorldPoint;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class Util {
 

@@ -3,6 +3,7 @@ package com.tileman.multiplayer.server;
 import com.tileman.GroupTileData;
 import com.tileman.TilemanModeTile;
 import com.tileman.managers.GroupTilemanProfileUtil;
+import com.tileman.managers.TilemanProfileUtil;
 import com.tileman.multiplayer.*;
 import com.tileman.TilemanProfile;
 
@@ -39,7 +40,7 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
             }
 
             handleGroupProfileSync(inputThread);
-
+            return true;
 
         } catch (NetworkShutdownException e) {
             e.printStackTrace();
@@ -59,6 +60,7 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
         TilemanPacket packet = inputThread.waitForNextPacket(this);
         assertPacketType(packet, TilemanPacketType.AUTHENTICATION);
         connectionProfile = inputThread.waitForNextObject(this);
+        assertPacketType(inputThread.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
 
         GroupTilemanProfile group = server.getGroupProfile();
 
@@ -88,7 +90,7 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
         outputQueue.flush();
     }
 
-    private void handleGroupProfileSync(ObjectInputStreamBufferThread inputThread) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
+    private void handleGroupProfileSync(ObjectInputStreamBufferThread inputThread) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException, IOException {
         TilemanPacket packet = inputThread.waitForNextPacket(this);
         if (packet.packetType == TilemanPacketType.GROUP_PROFILE_REQUEST) {
             assertPacketType(inputThread.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
@@ -143,7 +145,7 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
 
         switch (packet.packetType) {
             case TILE_SYNC_REQUEST:
-                handleTileSyncRequest(groupProfile.getGroupTileData());
+                handleTileSyncRequest(groupProfile.getGroupTileData(), input);
                 break;
             default:
                 throw new UnexpectedPacketTypeException("Unexpected packet type in server: " + packet.packetType);
@@ -163,11 +165,24 @@ class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
         server.updateTile(accountHash, tile, state);
     }
 
-    private void handleTileSyncRequest(GroupTileData groupTileData) {
+    @Override
+    protected void handleLeaveEvent(GroupTileData groupTileData, TilemanPacket leavePacket, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
+        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+        Long accountHash = Long.parseLong(leavePacket.message);
+        server.removeGroupMember(accountHash);
+    }
+
+    private void handleTileSyncRequest(GroupTileData groupTileData, ObjectInputStreamBufferThread input) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
+        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+
         Long myAccount = connectionProfile.getAccountHashLong();
         groupTileData.forEachProfile((accountHash, tileData) -> {
             if (!accountHash.equals(myAccount)) {
-                sendRegionHashReport(tileData, accountHash);
+                try {
+                    sendRegionHashReport(tileData, accountHash);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         });
     }

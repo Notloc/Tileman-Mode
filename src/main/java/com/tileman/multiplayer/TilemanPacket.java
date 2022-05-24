@@ -3,6 +3,7 @@ package com.tileman.multiplayer;
 import java.io.Serializable;
 import static com.tileman.multiplayer.TilemanPacketType.*;
 
+// TODO: delete this in favour of a RESPONSE/REQUEST model
 public class TilemanPacket implements Serializable {
     public final TilemanPacketType packetType;
     public final String message;
@@ -43,6 +44,14 @@ public class TilemanPacket implements Serializable {
 
     public static TilemanPacket createTileUpdatePacket(boolean state) {
         return new TilemanPacket(TILE_UPDATE, Boolean.toString(state));
+    }
+
+    public static TilemanPacket createJoinEventPacket(String joiningAccountHash) {
+        return new TilemanPacket(JOIN_EVENT, joiningAccountHash);
+    }
+
+    public static TilemanPacket createLeaveEventPacket(String joiningAccountHash) {
+        return new TilemanPacket(LEAVE_EVENT, joiningAccountHash);
     }
 
     public static TilemanPacket createEndOfDataPacket() {
