@@ -281,7 +281,7 @@ public class TilemanPluginPanel extends PluginPanel {
                     JButton hostButton = new JButton("Host Server");
                     hostButton.addActionListener(l -> {
                         TilemanMultiplayerService.startServer(stateManager, persistenceManager, "password", 7777);
-                        TilemanMultiplayerService.connect(client, stateManager, "localhost", 7777,"password");
+                        TilemanMultiplayerService.connect(plugin, stateManager, "localhost", 7777,"password");
                     });
                     multiplayerPanel.add(hostButton);
                 }
@@ -363,7 +363,7 @@ public class TilemanPluginPanel extends PluginPanel {
     }
 
     private boolean doTryToConnectDialog(String ip, int port, String password) {
-        TilemanMultiplayerService.connect(client, stateManager, ip, port, password);
+        TilemanMultiplayerService.connect(plugin, stateManager, ip, port, password);
         return true;
     }
 

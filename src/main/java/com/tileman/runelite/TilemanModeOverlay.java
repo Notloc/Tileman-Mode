@@ -67,7 +67,7 @@ public class TilemanModeOverlay extends Overlay
 	public Dimension render(Graphics2D graphics)
 	{
 		plugin.getVisiblePoints().forEach((accountHash, worldPoints) -> {
-			Color color = getTileColor(); // TODO: color by accountHash
+			Color color = getTileColor(accountHash);
 			for (WorldPoint point : worldPoints)
 			{
 				if (point.getPlane() != client.getPlane())
@@ -118,14 +118,18 @@ public class TilemanModeOverlay extends Overlay
 		OverlayUtil.renderPolygon(graphics, poly, color);
 	}
 
-	private Color getTileColor() {
-		if(config.enableTileWarnings()) {
-			if (plugin.getRemainingTiles() <= 0) {
-				return Color.RED;
-			} else if (plugin.getRemainingTiles() <= config.warningLimit()) {
-				return new Color(255, 153, 0);
+	private Color getTileColor(long accountHash) {
+		if (client.getAccountHash() == accountHash) {
+			if(config.enableTileWarnings()) {
+				if (plugin.getRemainingTiles() <= 0) {
+					return Color.RED;
+				} else if (plugin.getRemainingTiles() <= config.warningLimit()) {
+					return new Color(255, 153, 0);
+				}
 			}
+			return config.markerColor();
 		}
-		return config.markerColor();
+		// TODO: color by accountHash
+		return Color.magenta;
 	}
 }

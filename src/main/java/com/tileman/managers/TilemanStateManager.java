@@ -1,19 +1,16 @@
 package com.tileman.managers;
 
 import com.tileman.ProfileTileData;
-import com.tileman.GroupTileData;
 import com.tileman.TilemanModeTile;
 import com.tileman.TilemanProfile;
 import com.tileman.multiplayer.GroupTilemanProfile;
 import com.tileman.multiplayer.TilemanMultiplayerService;
-import com.tileman.multiplayer.TilemanPacket;
-import com.tileman.runelite.TilemanModeConfig;
+
 import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiConsumer;
 
 public class TilemanStateManager {

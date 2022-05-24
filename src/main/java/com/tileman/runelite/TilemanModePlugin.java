@@ -56,6 +56,7 @@ import net.runelite.client.util.ImageUtil;
 import javax.inject.Inject;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
@@ -123,7 +124,7 @@ public class TilemanModePlugin extends Plugin {
 
     @Getter
     private Map<Long, List<WorldPoint>> visiblePoints = new HashMap<>();
-    private boolean updateAllPointsFlag = false;
+    private AtomicBoolean updateAllPointsFlag = new AtomicBoolean();
 
     public List<BiConsumer<Boolean, Long>> onLoginStateChangedEvent = new ArrayList<>();
 
@@ -282,7 +283,8 @@ public class TilemanModePlugin extends Plugin {
 
 
     private void updateVisibleTilesIfNeeded() {
-        if (updateAllPointsFlag || multiplayerRegionWasUpdated()) {
+        if (updateAllPointsFlag.get() || multiplayerRegionWasUpdated()) {
+            updateAllPointsFlag.set(false);
             updateAllVisiblePoints();
         }
     }
@@ -302,8 +304,8 @@ public class TilemanModePlugin extends Plugin {
         return false;
     }
 
-    private void requestUpdateAllVisiblePoints() {
-        updateAllPointsFlag = true;
+    public void requestUpdateAllVisiblePoints() {
+        updateAllPointsFlag.set(true);
     }
 
     private void updateAllVisiblePoints() {

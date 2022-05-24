@@ -3,6 +3,8 @@ package com.tileman.multiplayer;
 import com.tileman.GroupTileData;
 import com.tileman.ProfileTileData;
 import com.tileman.TilemanModeTile;
+import com.tileman.multiplayer.model.*;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -14,6 +16,8 @@ public abstract class TilemanMultiplayerThread extends Thread {
 
     protected ConcurrentOutputQueue<Object> outputQueue;
 
+    @Getter
+    protected boolean isReady = false;
     protected boolean isShuttingDown = false;
     public boolean isShutdown() { return isShuttingDown; }
 
@@ -21,6 +25,7 @@ public abstract class TilemanMultiplayerThread extends Thread {
     public void run() {
         if (onStart()) {
             try {
+                isReady = true;
                 while (!isShutdown()) {
                     onUpdate();
                 }
@@ -33,58 +38,15 @@ public abstract class TilemanMultiplayerThread extends Thread {
     protected abstract void onUpdate() throws NetworkShutdownException, NetworkTimeoutException;
     protected abstract void onShutdown();
 
-
-    protected void requestGroupProfile() throws IOException {
-        outputQueue.queueData(
-                TilemanPacket.createGroupProfileRequest(),
-                TilemanPacket.createEndOfDataPacket()
-        );
+    protected void sendGroupProfileRequest() throws IOException {
+        outputQueue.queueData(new GroupProfileRequest());
         outputQueue.flush();
     }
 
-    protected void sendGroupProfile(GroupTilemanProfile groupProfile) throws IOException {
-        outputQueue.queueData(
-                TilemanPacket.createGroupProfileResponse(),
-                groupProfile,
-                TilemanPacket.createEndOfDataPacket()
-        );
+    protected void sendGroupProfileResponse(GroupTilemanProfile groupProfile) throws IOException {
+        outputQueue.queueData(new GroupProfileResponse(groupProfile));
         outputQueue.flush();
     }
-
-    protected GroupTilemanProfile handleGroupProfileResponse(ObjectInputStreamBufferThread input) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
-        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.GROUP_PROFILE_RESPONSE);
-        GroupTilemanProfile groupProfile = input.waitForNextObject(this);
-        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
-        return groupProfile;
-    }
-
-
-
-    protected boolean handlePacket(GroupTilemanProfile groupProfile, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        switch (packet.packetType) {
-            case TILE_UPDATE:
-                handleTileUpdate(groupProfile.getGroupTileData(), packet, input);
-                break;
-            case REGION_DATA_REQUEST:
-                handleRegionDataRequest(groupProfile.getGroupTileData(), input);
-                break;
-            case REGION_DATA_RESPONSE:
-                handleRegionDataResponse(groupProfile.getGroupTileData(), input);
-                break;
-            case REGION_HASH_REPORT:
-                handleRegionHashReport(groupProfile.getGroupTileData(), input);
-                break;
-            case LEAVE_EVENT:
-                handleLeaveEvent(groupProfile.getGroupTileData(), packet, input);
-            default:
-                return false;
-        }
-        return true;
-    }
-
-    protected abstract void handleTileUpdate(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException;
-    protected abstract void handleLeaveEvent(GroupTileData groupTileData, TilemanPacket packet, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException;
-
 
     protected void sendRegionHashReport(ProfileTileData tileData, long accountHash) throws IOException {
         List<RegionDataHash> regionHashData = new ArrayList<>();
@@ -94,21 +56,31 @@ public abstract class TilemanMultiplayerThread extends Thread {
             regionHashData.add(new RegionDataHash(accountHash, regionId, regionHash));
         });
 
-        outputQueue.queueData(
-                TilemanPacket.createRegionHashReport(),
-                regionHashData,
-                TilemanPacket.createEndOfDataPacket()
-        );
+        outputQueue.queueData(new RegionHashReportResponse(regionHashData));
         outputQueue.flush();
     }
 
-    protected void handleRegionHashReport(GroupTileData groupTileData, ObjectInputStreamBufferThread input) throws NetworkShutdownException, UnexpectedPacketTypeException, InterruptedException, NetworkTimeoutException {
-        Object object = input.waitForNextObject(this);
-        List<RegionDataHash> regionDataHashes = (ArrayList<RegionDataHash>)object;
+    protected void sendRegionDataRequest(List<AccountRegionId> regionIds) {
+        outputQueue.queueData(new RegionDataRequest(regionIds));
+    }
 
+    protected boolean handleNetworkObject(GroupTilemanProfile groupProfile, Object networkObject) throws UnexpectedNetworkObjectException {
+        if (networkObject instanceof RegionDataRequest) {
+            handleRegionDataRequest((RegionDataRequest) networkObject, groupProfile.getGroupTileData());
+        } else if (networkObject instanceof RegionDataResponse) {
+            handleRegionDataResponse((RegionDataResponse) networkObject, groupProfile.getGroupTileData());
+        } else if (networkObject instanceof RegionHashReportResponse) {
+            handleRegionHashReport((RegionHashReportResponse) networkObject, groupProfile.getGroupTileData());
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected void handleRegionHashReport(RegionHashReportResponse regionHashReportResponse, GroupTileData groupTileData) {
         List<AccountRegionId> regionsToRequest = new ArrayList<>();
-
-        regionDataHashes.forEach(regionInfo -> {
+        regionHashReportResponse.getRegionHashData().forEach(regionInfo -> {
             int hash = 0;
             if (groupTileData.hasRegion(regionInfo.accountHash, regionInfo.regionId)) {
                 hash = groupTileData.getRegionHash(regionInfo.accountHash, regionInfo.regionId);
@@ -118,59 +90,32 @@ public abstract class TilemanMultiplayerThread extends Thread {
                 regionsToRequest.add(new AccountRegionId(regionInfo.accountHash, regionInfo.regionId));
             }
         });
-
-        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
-
-        requestRegionData(regionsToRequest);
+        sendRegionDataRequest(regionsToRequest);
     }
 
-    protected void requestRegionData(List<AccountRegionId> regionIds) {
-        outputQueue.queueData(
-                TilemanPacket.createRegionDataRequest(),
-                regionIds,
-                TilemanPacket.createEndOfDataPacket()
-        );
-    }
-
-    protected void handleRegionDataRequest(GroupTileData groupTileData, ObjectInputStreamBufferThread input) throws NetworkShutdownException, InterruptedException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        List<AccountRegionId> requestedRegions = input.waitForNextObject(this);
-        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
-
-        requestedRegions.forEach(playerRegionId -> {
-            int regionId = playerRegionId.regionId;
-            Set<TilemanModeTile> regionTiles = groupTileData.getRegion(playerRegionId.accountHash, regionId);
+    protected void handleRegionDataRequest(RegionDataRequest regionDataRequest, GroupTileData groupTileData) {
+        regionDataRequest.getAccountRegionIds().forEach(accountRegionId -> {
+            int regionId = accountRegionId.regionId;
+            Set<TilemanModeTile> regionTiles = groupTileData.getRegion(accountRegionId.accountHash, regionId);
             if (regionTiles != null) {
-                outputQueue.queueData(
-                        TilemanPacket.createRegionDataResponse(),
-                        playerRegionId,
-                        regionTiles,
-                        TilemanPacket.createEndOfDataPacket()
-                );
+                outputQueue.queueData(new RegionDataResponse(accountRegionId, regionTiles));
             }
         });
     }
 
-    protected void handleRegionDataResponse(GroupTileData groupTileData, ObjectInputStreamBufferThread input) throws InterruptedException, NetworkShutdownException, UnexpectedPacketTypeException, NetworkTimeoutException {
-        AccountRegionId regionId = input.waitForNextObject(this);
-        Set<TilemanModeTile> tiles = input.waitForNextObject(this);
-        assertPacketType(input.waitForNextPacket(this), TilemanPacketType.END_OF_DATA);
+    protected void handleRegionDataResponse(RegionDataResponse regionDataResponse, GroupTileData groupTileData) {
+        AccountRegionId accountRegionId = regionDataResponse.getAccountRegionId();
+        Set<TilemanModeTile> tiles = regionDataResponse.getRegionTiles();
 
-        groupTileData.setRegionTiles(regionId.accountHash, regionId.regionId, tiles);
-        TilemanMultiplayerService.updatedRegionIds.add(regionId.regionId);
+        groupTileData.setRegionTiles(accountRegionId.accountHash, accountRegionId.regionId, tiles);
+        TilemanMultiplayerService.updatedRegionIds.add(accountRegionId.regionId);
     }
 
-
-    public static void assertPacketType(TilemanPacket packet, TilemanPacketType expectedType) throws UnexpectedPacketTypeException {
-        if (packet.packetType != expectedType) {
-            throw new UnexpectedPacketTypeException(String.format("Unexpected packet type. Expected %s but received %s.", expectedType, packet.packetType));
-        }
-    }
-
-    public void executeInBusyLoop(BusyFunction function) throws InterruptedException, UnexpectedPacketTypeException, NetworkShutdownException, NetworkTimeoutException {
+    public void executeInBusyLoop(BusyFunction function) throws InterruptedException, UnexpectedNetworkObjectException, NetworkShutdownException, NetworkTimeoutException {
         executeInBusyLoop(function, 25, NETWORK_TIMEOUT_MS);
     }
 
-    public void executeInBusyLoop(BusyFunction function, long sleepMs, long timeout) throws InterruptedException, UnexpectedPacketTypeException, NetworkShutdownException, NetworkTimeoutException {
+    public void executeInBusyLoop(BusyFunction function, long sleepMs, long timeout) throws InterruptedException, UnexpectedNetworkObjectException, NetworkShutdownException, NetworkTimeoutException {
         double time = System.currentTimeMillis();
         while (!isShutdown()) {
             if (function.run() == BusyFunction.Status.FINISHED) {
@@ -183,6 +128,11 @@ public abstract class TilemanMultiplayerThread extends Thread {
             }
         }
         throw new NetworkShutdownException();
+    }
+
+    protected GroupTilemanProfile waitForGroupProfileResponse(ObjectInputStreamBufferThread input) throws NetworkShutdownException, UnexpectedNetworkObjectException, InterruptedException, NetworkTimeoutException {
+        GroupProfileResponse groupProfileResponse = input.waitForNextObject(this);
+        return groupProfileResponse.getGroupProfile();
     }
 }
 

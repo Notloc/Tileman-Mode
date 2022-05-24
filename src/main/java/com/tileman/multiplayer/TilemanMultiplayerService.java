@@ -1,15 +1,11 @@
 package com.tileman.multiplayer;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
-import com.tileman.managers.GroupTilemanProfileUtil;
 import com.tileman.managers.RunelitePersistenceManager;
 import com.tileman.managers.TilemanStateManager;
-import com.tileman.managers.TilemanProfileUtil;
 import com.tileman.TilemanModeTile;
 import com.tileman.multiplayer.client.TilemanClient;
 import com.tileman.multiplayer.server.TilemanServer;
-import net.runelite.api.Client;
-import net.runelite.client.config.ConfigManager;
+import com.tileman.runelite.TilemanModePlugin;
 
 import java.util.Collection;
 import java.util.Set;
@@ -60,12 +56,12 @@ public class TilemanMultiplayerService {
         invokeMultiplayerStateChanged();
     }
 
-    public static void connect(Client client, TilemanStateManager stateManager, String hostname, int port, String password) {
+    public static void connect(TilemanModePlugin plugin, TilemanStateManager stateManager, String hostname, int port, String password) {
         if (isConnected()) {
             disconnect();
         }
 
-        serverClient = new TilemanClient(client, stateManager, hostname, port, password);
+        serverClient = new TilemanClient(plugin, stateManager, hostname, port, password);
         serverClient.start();
     }
 
@@ -81,7 +77,7 @@ public class TilemanMultiplayerService {
 
     public static void sendMultiplayerTileUpdate(TilemanModeTile tile, boolean state) {
         if (isConnected()) {
-            serverClient.sendTileUpdate(tile, state);
+            serverClient.sendTileUpdateRequest(tile, state);
         }
     }
 

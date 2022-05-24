@@ -19,6 +19,16 @@ public class ConcurrentOutputQueue<T> {
         this.objectOutputStream = new ObjectOutputStream(outputStream);
     }
 
+    public void sendImmediately(T obj) throws IOException {
+        l.lock();
+        try {
+            objectOutputStream.writeObject(obj);
+            objectOutputStream.flush();
+        } finally {
+            l.unlock();
+        }
+    }
+
     public void queueData(T... data) {
         l.lock();
         try {

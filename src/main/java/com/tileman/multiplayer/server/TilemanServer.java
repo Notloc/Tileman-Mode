@@ -10,8 +10,10 @@ import com.tileman.managers.ProfileTileDataUtil;
 import com.tileman.multiplayer.GroupTilemanProfile;
 import com.tileman.multiplayer.MpUtil;
 import com.tileman.multiplayer.TilemanMultiplayerService;
-import com.tileman.multiplayer.TilemanPacket;
-import com.tileman.runelite.TilemanModeConfig;
+import com.tileman.multiplayer.model.JoinResponse;
+import com.tileman.multiplayer.model.LeaveResponse;
+import com.tileman.multiplayer.model.TileUpdateRequest;
+import com.tileman.multiplayer.model.TileUpdateResponse;
 import lombok.Getter;
 
 import java.io.*;
@@ -48,19 +50,14 @@ public class TilemanServer extends Thread {
     public void addGroupMember(TilemanProfile profile) {
         groupProfile.addMember(profile);
         GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
-        queueOutputForAllConnections(
-                TilemanPacket.createJoinEventPacket(profile.getAccountHash()),
-                TilemanPacket.createEndOfDataPacket()
-        );
+
+        queueOutputForAllConnections(new JoinResponse(profile.getAccountHashLong()));
     }
 
     public void removeGroupMember(Long accountHash) {
         groupProfile.removeMember(accountHash);
         GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
-        queueOutputForAllConnections(
-                TilemanPacket.createLeaveEventPacket(accountHash.toString()),
-                TilemanPacket.createEndOfDataPacket()
-        );
+        queueOutputForAllConnections(new LeaveResponse(accountHash));
     }
 
 
@@ -143,7 +140,9 @@ public class TilemanServer extends Thread {
         } catch (IOException e) {}
     }
 
-    void updateTile(long accountHash, TilemanModeTile tile, boolean state) {
+    void updateTile(TileUpdateRequest tileUpdateRequest, long accountHash) {
+        TilemanModeTile tile = tileUpdateRequest.getTile();
+        boolean state = tileUpdateRequest.isTileState();
         ProfileTileData tileData = groupProfile.getGroupTileData().getProfileTileData(accountHash);
         if (state) {
             tileData.addTile(tile.getRegionId(), tile);
@@ -151,18 +150,8 @@ public class TilemanServer extends Thread {
             tileData.removeTile(tile.getRegionId(), tile);
         }
 
-        forwardTileUpdate(accountHash, tile, state);
+        queueOutputForAllConnections(new TileUpdateResponse(tile, state, accountHash));
         ProfileTileDataUtil.saveRegion(accountHash, tile.getRegionId(), tileData.getRegion(tile.getRegionId()), persistenceManager);
-    }
-
-    private void forwardTileUpdate(long sender, TilemanModeTile tile, boolean state) {
-        // Send the update to all connected players
-        queueOutputForAllConnections(
-                TilemanPacket.createTileUpdatePacket(state),
-                sender,
-                tile,
-                TilemanPacket.createEndOfDataPacket()
-        );
     }
 
     void queueOutputForAllConnections(Object... objects) {
@@ -172,7 +161,7 @@ public class TilemanServer extends Thread {
     }
 
     private void queueOutputForConnection(TilemanServerConnectionHandler connection, Object... data) {
-        //TODO: if connection is ready
+        if (connection.isReady())
             connection.queueData(data);
     }
 
