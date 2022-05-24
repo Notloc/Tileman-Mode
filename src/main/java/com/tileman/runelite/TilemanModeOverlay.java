@@ -80,20 +80,6 @@ public class TilemanModeOverlay extends Overlay
 		return null;
 	}
 
-	private List<WorldPoint> worldPointBuffer = new ArrayList<>();
-	private void renderTiles(Graphics2D graphics, Collection<TilemanModeTile> tiles, Color color) {
-		worldPointBuffer.clear();
-		Util.translateTilesToWorldPoints(client, tiles, worldPointBuffer);
-
-		for (final WorldPoint point : worldPointBuffer)
-		{
-			if (point.getPlane() != client.getPlane()) {
-				continue;
-			}
-			drawTile(graphics, point, color);
-		}
-	}
-
 	private void drawTile(Graphics2D graphics, WorldPoint point, Color color)
 	{
 		WorldPoint playerLocation = client.getLocalPlayer().getWorldLocation();

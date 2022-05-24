@@ -314,14 +314,13 @@ public class TilemanPluginPanel extends PluginPanel {
             } else {
                 JButton createGroupButton = new JButton("Create Group");
                 createGroupButton.addActionListener(l -> {
-                    String name = JOptionPane.showInputDialog("Group Name:");
-                    while (name == null || name.length() < 3 || name.equals(GroupTilemanProfile.NONE.getGroupName())) {
+                    String name;
+                    do {
                         name = JOptionPane.showInputDialog("Group Name:");
-                    }
-
-                    if (name == null) {
-                        return;
-                    }
+                        if (name == null) {
+                            return;
+                        }
+                    } while(name.length() < 3 || name.equals(GroupTilemanProfile.NONE.getGroupName()));
 
                     GroupTilemanProfile groupProfile = new GroupTilemanProfile(name, client.getAccountHash(), client.getLocalPlayer().getName());
                     stateManager.assignGroupProfile(stateManager.getActiveProfile(), groupProfile);
