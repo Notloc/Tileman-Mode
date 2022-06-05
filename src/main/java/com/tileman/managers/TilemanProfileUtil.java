@@ -36,7 +36,9 @@ import com.tileman.runelite.TilemanModeConfig;
 import com.tileman.TilemanProfileExportData;
 import lombok.extern.slf4j.Slf4j;
 
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 
 @Slf4j
 public final class TilemanProfileUtil {
@@ -71,7 +73,7 @@ public final class TilemanProfileUtil {
         return persistenceManager.loadFromJsonOrDefault(TilemanModeConfig.CONFIG_GROUP, key, TilemanProfile.class, TilemanProfile.NONE);
     }
 
-    static void saveProfile(TilemanProfile profile, PersistenceManager persistenceManager) {
+    public static void saveProfile(TilemanProfile profile, PersistenceManager persistenceManager) {
         if (profile.equals(TilemanProfile.NONE)) {
             return;
         }

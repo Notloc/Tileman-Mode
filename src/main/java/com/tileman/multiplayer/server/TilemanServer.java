@@ -7,13 +7,11 @@ import com.tileman.TilemanProfile;
 import com.tileman.managers.GroupTilemanProfileUtil;
 import com.tileman.managers.PersistenceManager;
 import com.tileman.managers.ProfileTileDataUtil;
+import com.tileman.managers.TilemanStateManager;
 import com.tileman.multiplayer.GroupTilemanProfile;
 import com.tileman.multiplayer.MpUtil;
 import com.tileman.multiplayer.TilemanMultiplayerService;
-import com.tileman.multiplayer.model.JoinResponse;
-import com.tileman.multiplayer.model.LeaveResponse;
-import com.tileman.multiplayer.model.TileUpdateRequest;
-import com.tileman.multiplayer.model.TileUpdateResponse;
+import com.tileman.multiplayer.model.*;
 import lombok.Getter;
 
 import java.io.*;
@@ -28,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TilemanServer extends Thread {
 
     @Getter
-    private GroupTilemanProfile groupProfile;
+    private TilemanStateManager stateManager;
     private final PersistenceManager persistenceManager;
 
     @Getter
@@ -40,39 +38,44 @@ public class TilemanServer extends Thread {
 
     private boolean isShutdown;
 
-    public TilemanServer(GroupTilemanProfile groupProfile, PersistenceManager persistenceManager, int portNumber, String password) {
-        this.groupProfile = groupProfile;
+    public TilemanServer(TilemanStateManager stateManager, PersistenceManager persistenceManager, int portNumber, String password) {
+        this.stateManager = stateManager;
         this.persistenceManager = persistenceManager;
         this.portNumber = portNumber;
         this.hashedPassword = MpUtil.sha512(password);
     }
 
     public void addGroupMember(TilemanProfile profile) {
-        groupProfile.addMember(profile);
-        GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
-
-        queueOutputForAllConnections(new JoinResponse(profile.getAccountHashLong()));
+        stateManager.addToGroup(profile);
+        queueOutputForAllConnections(new JoinResponse(profile));
     }
 
     public void removeGroupMember(Long accountHash) {
-        groupProfile.removeMember(accountHash);
-        GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
+        stateManager.removeFromGroup(accountHash);
         queueOutputForAllConnections(new LeaveResponse(accountHash));
     }
 
 
     public void updateGroupProfileIfNewer(GroupTilemanProfile incomingGroupProfile, long sender) {
-        boolean incomingIsNewer = incomingGroupProfile.getLastUpdated().isAfter(groupProfile.getLastUpdated());
-        if (incomingIsNewer && validateGroupChanges(groupProfile, incomingGroupProfile, sender)) {
-            GroupTileData groupTileData = this.groupProfile.getGroupTileData();
-            this.groupProfile = incomingGroupProfile;
-            this.groupProfile.setGroupTileData(groupTileData);
-            GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
+        return;
+
+        //boolean incomingIsNewer = incomingGroupProfile.getLastUpdated().isAfter(groupProfile.getLastUpdated());
+        //if (incomingIsNewer && validateGroupChanges(groupProfile, incomingGroupProfile, sender)) {
+        //    GroupTileData groupTileData = this.groupProfile.getGroupTileData();
+        //    this.groupProfile = incomingGroupProfile;
+        //    this.groupProfile.setGroupTileData(groupTileData);
+        //    GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
 
             //purgeInvalidMemberData();
             //reauthenticateConnections();
             //forwardGroupProfile()
-        }
+        //}
+    }
+
+    protected void handleProfileUpdateRequest(ProfileUpdateRequest profileUpdateRequest) {
+        ProfileUpdateResponse updateResponse = new ProfileUpdateResponse(profileUpdateRequest);
+        stateManager.updateProfileInGroup(updateResponse.getUpdatedProfile());
+        queueOutputForAllConnections(updateResponse);
     }
 
     private boolean validateGroupChanges(GroupTilemanProfile current, GroupTilemanProfile incoming, long sender) {
@@ -143,7 +146,8 @@ public class TilemanServer extends Thread {
     void updateTile(TileUpdateRequest tileUpdateRequest, long accountHash) {
         TilemanModeTile tile = tileUpdateRequest.getTile();
         boolean state = tileUpdateRequest.isTileState();
-        ProfileTileData tileData = groupProfile.getGroupTileData().getProfileTileData(accountHash);
+
+        ProfileTileData tileData = stateManager.getProfileDataForProfile(accountHash);
         if (state) {
             tileData.addTile(tile.getRegionId(), tile);
         } else {

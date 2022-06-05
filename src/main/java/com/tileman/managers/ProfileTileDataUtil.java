@@ -26,7 +26,7 @@ public final class ProfileTileDataUtil {
     }
 
     public static void saveRegion(long accountHash, int regionId, Set<TilemanModeTile> tiles, PersistenceManager persistenceManager) {
-        TilemanProfile profile = new TilemanProfile(accountHash, "TEMP");
+        TilemanProfile profile = new TilemanProfile(accountHash, "TEMP"); // Hack to allow saving
         saveRegion(profile, regionId, tiles, persistenceManager);
     }
 

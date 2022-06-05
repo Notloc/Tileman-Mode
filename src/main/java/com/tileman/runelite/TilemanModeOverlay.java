@@ -26,7 +26,9 @@
  */
 package com.tileman.runelite;
 
+import com.tileman.TilemanProfile;
 import com.tileman.Util;
+import com.tileman.managers.TilemanStateManager;
 import com.tileman.multiplayer.ConcurrentSetMap;
 import com.tileman.multiplayer.TilemanMultiplayerService;
 import com.tileman.TilemanModeTile;
@@ -67,7 +69,7 @@ public class TilemanModeOverlay extends Overlay
 	public Dimension render(Graphics2D graphics)
 	{
 		plugin.getVisiblePoints().forEach((accountHash, worldPoints) -> {
-			Color color = getTileColor(accountHash);
+			Color color = getTileColor(plugin.getTilemanStateManager(), accountHash);
 			for (WorldPoint point : worldPoints)
 			{
 				if (point.getPlane() != client.getPlane())
@@ -104,8 +106,9 @@ public class TilemanModeOverlay extends Overlay
 		OverlayUtil.renderPolygon(graphics, poly, color);
 	}
 
-	private Color getTileColor(long accountHash) {
-		if (client.getAccountHash() == accountHash) {
+	private Color getTileColor(TilemanStateManager stateManager, long accountHash) {
+		TilemanProfile profile = stateManager.getProfile(accountHash);
+		if (profile != null) {
 			if(config.enableTileWarnings()) {
 				if (plugin.getRemainingTiles() <= 0) {
 					return Color.RED;
@@ -113,9 +116,9 @@ public class TilemanModeOverlay extends Overlay
 					return new Color(255, 153, 0);
 				}
 			}
-			return config.markerColor();
+			return profile.getColor();
 		}
-		// TODO: color by accountHash
+
 		return Color.magenta;
 	}
 }

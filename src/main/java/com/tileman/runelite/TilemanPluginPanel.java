@@ -10,10 +10,12 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
+import org.pushingpixels.substance.internal.contrib.randelshofer.quaqua.colorchooser.ColorSlidersChooser;
 
 import javax.inject.Singleton;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.colorchooser.AbstractColorChooserPanel;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.util.ArrayList;
@@ -99,26 +101,44 @@ public class TilemanPluginPanel extends PluginPanel {
     private JPanel buildProfilePanel() {
         TilemanProfile activeProfile = stateManager.getActiveProfile();
         boolean isLoggedIn = plugin.isLoggedIn();
+        boolean hasActiveProfile = !activeProfile.equals(TilemanProfile.NONE);
 
         JPanel profilePanel = new JPanel();
         profilePanel.setBorder(BorderFactory.createLineBorder(Color.black));
         addVerticalLayout(profilePanel);
         {
-            JLabel profileLabel = new JLabel();
-            profileLabel.setAlignmentX(CENTER_ALIGNMENT);
-
             addSpacer(profilePanel);
 
-            if (!isLoggedIn) {
-                profileLabel.setText("Login to start");
-            } else {
-                if (!activeProfile.equals(TilemanProfile.NONE)) {
+            JPanel profileLabelPanel = new JPanel();
+            profilePanel.add(profileLabelPanel);
+            {
+                JLabel profileLabel = new JLabel();
+                profileLabel.setAlignmentX(CENTER_ALIGNMENT);
+
+                if (hasActiveProfile) {
                     profileLabel.setText(activeProfile.getProfileName());
+                } else if (!isLoggedIn) {
+                    profileLabel.setText("Login to start");
                 } else {
                     profileLabel.setText("Create a profile to start");
                 }
+
+                profileLabelPanel.add(profileLabel);
+
+                if (hasActiveProfile) {
+                    JButton colorButton = new JButton("");
+                    colorButton.setBackground(activeProfile.getColor());
+                    colorButton.addActionListener(l -> {
+                        TilemanProfile profile = stateManager.getActiveProfile();
+                        Color col = JColorChooser.showDialog(null,"Select a color", profile.getColor());
+                        profile.setColor(col);
+                        TilemanProfileUtil.saveProfile(profile, persistenceManager);
+                        TilemanMultiplayerService.sendProfileUpdate();
+                        rebuild();
+                    });
+                    profileLabelPanel.add(colorButton);
+                }
             }
-            profilePanel.add(profileLabel);
 
             if (!stateManager.getActiveGroupProfile().equals(GroupTilemanProfile.NONE)) {
                 JLabel groupLabel = new JLabel(stateManager.getActiveGroupProfile().getGroupName());
@@ -306,7 +326,7 @@ public class TilemanPluginPanel extends PluginPanel {
                 // TODO: Double confirmation box this
                 JButton leaveGroupButton = new JButton("Leave Group");
                 leaveGroupButton.addActionListener(l -> {
-                    stateManager.removeFromGroup(stateManager.getActiveProfile());
+                    stateManager.leaveGroup(stateManager.getActiveProfile());
                 });
 
                 multiplayerPanel.add(leaveGroupButton);
@@ -322,7 +342,7 @@ public class TilemanPluginPanel extends PluginPanel {
                         }
                     } while(name.length() < 3 || name.equals(GroupTilemanProfile.NONE.getGroupName()));
 
-                    GroupTilemanProfile groupProfile = new GroupTilemanProfile(name, client.getAccountHash(), client.getLocalPlayer().getName());
+                    GroupTilemanProfile groupProfile = new GroupTilemanProfile(name, stateManager.getActiveProfile());
                     stateManager.assignGroupProfile(stateManager.getActiveProfile(), groupProfile);
                     rebuild();
                 });
@@ -334,7 +354,6 @@ public class TilemanPluginPanel extends PluginPanel {
 
                 multiplayerPanel.add(createGroupButton);
                 multiplayerPanel.add(joinGroupButton);
-
             }
         }
 

@@ -28,6 +28,7 @@ import com.tileman.multiplayer.GroupTilemanProfile;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.awt.*;
 import java.beans.Transient;
 import java.io.Serializable;
 
@@ -35,11 +36,11 @@ public class TilemanProfile implements Serializable {
     public static final TilemanProfile NONE = new TilemanProfile(-1, "None");
 
     @Getter private final String accountHash;
-    @Getter private final String profileName;
     private String multiplayerGroupId;
 
-    @Getter @Setter
-    private transient ProfileTileData tileData;
+    @Getter @Setter private String profileName;
+    @Getter @Setter private Color color =  Color.yellow;
+    @Getter @Setter private transient ProfileTileData tileData;
 
     public TilemanProfile(long accountHash, String profileName) {
         this.accountHash = String.valueOf(accountHash);

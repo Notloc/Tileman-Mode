@@ -64,7 +64,7 @@ public class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
             }
         }
 
-        GroupTilemanProfile group = server.getGroupProfile();
+        GroupTilemanProfile group = server.getStateManager().getActiveGroupProfile();
         if (group.isMember(connectionProfile.getAccountHashLong())) {
             return true;
         }
@@ -89,7 +89,7 @@ public class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
         } else if (!(networkObject instanceof GroupProfileRequest)) {
             throw new UnexpectedNetworkObjectException(networkObject);
         }
-        sendGroupProfileResponse(server.getGroupProfile());
+        sendGroupProfileResponse(server.getStateManager().getActiveGroupProfile());
     }
 
     @Override
@@ -115,7 +115,7 @@ public class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
 
             Object networkObject = inputThread.tryGetNextObject();
             if (networkObject != null) {
-                handleNetworkObject(server.getGroupProfile(), networkObject);
+                handleNetworkObject(server.getStateManager().getActiveGroupProfile(), networkObject);
             }
         } catch (UnexpectedNetworkObjectException e) {
             e.printStackTrace();
@@ -136,6 +136,8 @@ public class TilemanServerConnectionHandler extends TilemanMultiplayerThread {
             handleTileUpdateRequest((TileUpdateRequest) networkObject);
         } else if (networkObject instanceof LeaveRequest) {
             handleLeaveRequest((LeaveRequest) networkObject);
+        } else if (networkObject instanceof ProfileUpdateRequest) {
+            server.handleProfileUpdateRequest((ProfileUpdateRequest) networkObject);
         } else {
             throw new UnexpectedNetworkObjectException(networkObject);
         }

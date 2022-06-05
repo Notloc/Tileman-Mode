@@ -23,7 +23,7 @@ public class TilemanStateManager {
 
     public List<BiConsumer<TilemanProfile, GroupTilemanProfile>> onProfileChangedEvent = new ArrayList<>();
 
-    public  TilemanStateManager(PersistenceManager persistenceManager) {
+    public TilemanStateManager(PersistenceManager persistenceManager) {
         this.persistenceManager = persistenceManager;
         this.gameRulesManager = new TilemanGameRulesManager(this, persistenceManager);
     }
@@ -59,6 +59,7 @@ public class TilemanStateManager {
 
     void setActiveGroupProfile(TilemanProfile activeProfile, GroupTilemanProfile groupProfile) {
         this.activeGroupProfile = groupProfile;
+        groupProfile.setProfileInstance(activeProfile);
         this.activeGroupProfile.setGroupTileData(ProfileTileDataUtil.loadGroupTileData(groupProfile, persistenceManager));
         this.gameRulesManager.setActiveGroupProfile(activeProfile, groupProfile);
         onProfileChangedEvent.forEach(listener -> listener.accept(activeProfile, activeGroupProfile));
@@ -133,7 +134,27 @@ public class TilemanStateManager {
         GroupTilemanProfileUtil.saveGroupProfile(groupProfile, persistenceManager);
     }
 
-    public void removeFromGroup(TilemanProfile profile) {
+    public boolean addToGroup(TilemanProfile profile) {
+        if (activeGroupProfile.equals(GroupTilemanProfile.NONE) || profile.equals(TilemanProfile.NONE)) {
+            return false;
+        }
+
+        activeGroupProfile.addMember(profile);
+        GroupTilemanProfileUtil.saveGroupProfile(activeGroupProfile, persistenceManager);
+        return true;
+    }
+
+    public boolean removeFromGroup(long accountHash) {
+        if (activeGroupProfile.equals(GroupTilemanProfile.NONE)) {
+            return false;
+        }
+        activeGroupProfile.removeMember(accountHash);
+
+        GroupTilemanProfileUtil.saveGroupProfile(activeGroupProfile, persistenceManager);
+        return true;
+    }
+
+    public void leaveGroup(TilemanProfile profile) {
         if (profile.equals(TilemanProfile.NONE) || !profile.isGroupTileman()) {
             return;
         }
@@ -148,6 +169,23 @@ public class TilemanStateManager {
         }
 
         TilemanProfileUtil.saveProfile(profile, persistenceManager);
+    }
+
+    public void updateProfileInGroup(TilemanProfile profile) {
+        if (activeGroupProfile.equals(GroupTilemanProfile.NONE)) {
+            return;
+        }
+        activeGroupProfile.updateProfile(profile);
+        GroupTilemanProfileUtil.saveGroupProfile(activeGroupProfile, persistenceManager);
+    }
+
+    public TilemanProfile getProfile(long accountHash) {
+        if (activeProfile != null && activeProfile.getAccountHashLong() == accountHash) {
+            return activeProfile;
+        } else if (activeGroupProfile != null) {
+            return activeGroupProfile.getGroupMemberProfile(accountHash);
+        }
+        return null;
     }
 
     public int countUnlockedTiles() {

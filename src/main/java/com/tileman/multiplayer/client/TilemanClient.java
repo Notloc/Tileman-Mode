@@ -1,6 +1,7 @@
 package com.tileman.multiplayer.client;
 
 import com.tileman.GroupTileData;
+import com.tileman.managers.GroupTilemanProfileUtil;
 import com.tileman.managers.TilemanStateManager;
 import com.tileman.multiplayer.*;
 import com.tileman.Util;
@@ -17,8 +18,6 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
     private final TilemanModePlugin plugin;
     private final TilemanStateManager stateManager;
-    private final TilemanProfile profile;
-    private /*final*/ GroupTilemanProfile groupProfile;
 
     private final String hostname;
     private final int portNumber;
@@ -31,7 +30,6 @@ public class TilemanClient extends TilemanMultiplayerThread {
     public TilemanClient(TilemanModePlugin plugin, TilemanStateManager stateManager, String hostname, int portNumber, String password) {
         this.plugin = plugin;
         this.stateManager = stateManager;
-        this.profile = stateManager.getActiveProfile();
 
         this.hostname = hostname;
         this.portNumber = portNumber;
@@ -41,7 +39,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
     @Override
     protected boolean onStart() {
         System.out.println("Launching MP client");
-        if (Util.isEmpty(hostname) || profile.equals(TilemanProfile.NONE)) {
+        if (Util.isEmpty(hostname) || stateManager.getActiveProfile().equals(TilemanProfile.NONE)) {
             return false;
         }
 
@@ -58,11 +56,11 @@ public class TilemanClient extends TilemanMultiplayerThread {
             }
 
             syncGroupProfile();
-            if (this.groupProfile.equals(GroupTilemanProfile.NONE)) {
+            if (stateManager.getActiveGroupProfile().equals(GroupTilemanProfile.NONE)) {
                 return false;
             }
 
-            sendTileSyncRequest(groupProfile.getGroupTileData());
+            sendTileSyncRequest(stateManager.getActiveGroupProfile().getGroupTileData());
             return true;
 
         } catch (UnknownHostException unknownHostException) {
@@ -82,7 +80,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
         String hashedPassword = MpUtil.sha512(this.password);
         this.password = null;
 
-        outputQueue.queueData(new AuthenticationRequest(profile, hashedPassword));
+        outputQueue.queueData(new AuthenticationRequest(stateManager.getActiveProfile(), hashedPassword));
         outputQueue.flush();
     }
 
@@ -93,6 +91,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
     // Get the latest group profile data from the server. In certain cases the leader will be uploading a newer version to the server/others.
     private void syncGroupProfile() throws NetworkShutdownException, UnexpectedNetworkObjectException, InterruptedException, NetworkTimeoutException, IOException {
+        TilemanProfile profile = stateManager.getActiveProfile();
         if (profile.isGroupTileman()) {
             sendGroupProfileResponse(stateManager.getActiveGroupProfile());
         } else {
@@ -101,7 +100,6 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
         GroupTilemanProfile groupProfile = waitForGroupProfileResponse(inputThread);
         stateManager.assignGroupProfile(profile, groupProfile);
-        this.groupProfile = groupProfile;
     }
 
     private void sendTileSyncRequest(GroupTileData groupTileData) throws IOException {
@@ -110,12 +108,17 @@ public class TilemanClient extends TilemanMultiplayerThread {
         outputQueue.flush();
 
         // Report state of my tiles to server
-        long accountHash = profile.getAccountHashLong();
+        long accountHash = stateManager.getActiveProfile().getAccountHashLong();
         sendRegionHashReport(groupTileData.getProfileTileData(accountHash), accountHash);
     }
 
     public void sendTileUpdateRequest(TilemanModeTile tile, boolean state) {
         outputQueue.queueData(new TileUpdateRequest(tile, state));
+    }
+
+    public void sendProfileUpdate() {
+        TilemanProfile profile = stateManager.getActiveProfile();
+        outputQueue.queueData(new ProfileUpdateRequest(profile, profile.getProfileName(), profile.getColor()));
     }
 
     @Override
@@ -136,7 +139,7 @@ public class TilemanClient extends TilemanMultiplayerThread {
 
             Object networkObject = inputThread.tryGetNextObject();
             if (networkObject != null) {
-                handleNetworkObject(groupProfile, networkObject);
+                handleNetworkObject(stateManager.getActiveGroupProfile(), networkObject);
             }
         } catch (UnexpectedNetworkObjectException unexpectedPacketTypeException) {
             unexpectedPacketTypeException.printStackTrace();
@@ -157,6 +160,8 @@ public class TilemanClient extends TilemanMultiplayerThread {
             handleTileUpdateResponse((TileUpdateResponse) networkObject, groupProfile.getGroupTileData());
         } else if (networkObject instanceof LeaveResponse) {
             handleLeaveResponse((LeaveResponse) networkObject, groupProfile.getGroupTileData());
+        } else if (networkObject instanceof ProfileUpdateResponse) {
+            handleProfileUpdate((ProfileUpdateResponse) networkObject);
         } else {
             throw new UnexpectedNetworkObjectException(networkObject);
         }
@@ -175,7 +180,16 @@ public class TilemanClient extends TilemanMultiplayerThread {
     }
 
     private void handleJoinResponse(JoinResponse joinResponse) {
+        stateManager.updateProfileInGroup(joinResponse.getProfile());
         plugin.requestUpdateAllVisiblePoints();
+    }
+
+    private void handleProfileUpdate(ProfileUpdateResponse profileUpdateResponse) {
+        TilemanProfile updatedProfile = profileUpdateResponse.getUpdatedProfile();
+        if (updatedProfile.equals(stateManager.getActiveProfile())) {
+            return; // ignore self updates
+        }
+        stateManager.updateProfileInGroup(updatedProfile);
     }
 
     public void leaveGroup() {

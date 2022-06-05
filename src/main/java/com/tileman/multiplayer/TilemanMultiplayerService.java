@@ -45,7 +45,7 @@ public class TilemanMultiplayerService {
             return;
         }
 
-        server = new TilemanServer(stateManager.getActiveGroupProfile(), persistenceManager, port, password);
+        server = new TilemanServer(stateManager, persistenceManager, port, password);
         server.start();
     }
 
@@ -78,6 +78,12 @@ public class TilemanMultiplayerService {
     public static void sendMultiplayerTileUpdate(TilemanModeTile tile, boolean state) {
         if (isConnected()) {
             serverClient.sendTileUpdateRequest(tile, state);
+        }
+    }
+
+    public static void sendProfileUpdate() {
+        if (isConnected()) {
+            serverClient.sendProfileUpdate();
         }
     }
 
